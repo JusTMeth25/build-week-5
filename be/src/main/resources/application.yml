@@ -3,13 +3,9 @@ spring:
     name: piattaforma-eventi
 
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/BUILD-WEEK-5}
-    name: progetto-base
-
-  datasource:
     # In locale valgono i valori dopo i due punti. Su Render DatabaseUrl legge
     # DATABASE_URL e sovrascrive queste tre proprieta'.
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/progetto_base}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/BUILD-WEEK-5}
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:admin}
 
@@ -48,7 +44,6 @@ spring:
         transport:
           protocol: smtp
 
-server:
 server:
   # Render assegna la porta in PORT.
   port: ${PORT:8080}
