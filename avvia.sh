@@ -3,11 +3,19 @@
 # BE in background, FE in primo piano: Ctrl+C chiude entrambi.
 cd "$(dirname "$0")" || exit 1
 
+# ---------- PostgreSQL: serve il database BUILD-WEEK-5 sulla 5432 ----------
+# DB_URL del progetto, imposta qui perche' una variabile d'ambiente rimasta da
+# un altro progetto avrebbe la precedenza su application.yml e il backend si
+# collegherebbe al database sbagliato. Utente e password restano quelli
+# dell'ambiente (DB_USERNAME / DB_PASSWORD), o i valori di application.yml.
+export DB_URL="jdbc:postgresql://localhost:5432/BUILD-WEEK-5"
+
 # ---------- PostgreSQL: serve il database progetto_base sulla 5432 ----------
 if nc -z localhost 5432 >/dev/null 2>&1; then
   echo "[postgres] in ascolto sulla 5432."
 else
   echo "[postgres] porta 5432 chiusa: il backend non partira'."
+  echo "           createdb -U postgres BUILD-WEEK-5"
   echo "           createdb -U postgres progetto_base"
 fi
 

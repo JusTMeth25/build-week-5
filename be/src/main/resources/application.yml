@@ -1,5 +1,9 @@
 spring:
   application:
+    name: piattaforma-eventi
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/BUILD-WEEK-5}
     name: progetto-base
 
   datasource:
@@ -18,6 +22,33 @@ spring:
         jdbc:
           time_zone: UTC
 
+  jackson:
+    default-property-inclusion: non_null
+    deserialization:
+      fail-on-unknown-properties: false
+      fail-on-null-for-primitives: false
+
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 25MB
+
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+        transport:
+          protocol: smtp
+
+server:
 server:
   # Render assegna la porta in PORT.
   port: ${PORT:8080}
@@ -35,5 +66,21 @@ management:
 
 app:
   cors:
+    allowed-origins: ${ALLOWED_ORIGIN:http://localhost:5173,http://localhost:4173}
+  mail:
+    mittente: ${MAIL_FROM:no-reply@piattaforma-eventi.it}
+    abilitato: ${MAIL_ABILITATO:true}
+  ai:
+    abilitata: ${AI_ABILITATA:true}
+    modello: "${AI_MODELLO:nvidia/nemotron-nano-9b-v2:free}"
+    chiave: ${OPENROUTER_API_KEY:}
+  verifica:
+    durata-codice-minuti: 15
+  sicurezza:
+    tentativi-massimi: ${LOGIN_TENTATIVI_MASSIMI:5}
+    blocco-minuti: ${LOGIN_BLOCCO_MINUTI:15}
+    jwt:
+      segreto: ${JWT_SECRET:}
+      scadenza-minuti: ${JWT_SCADENZA_MINUTI:120}
     # In produzione: ALLOWED_ORIGIN=https://<fe>.onrender.com (piu' valori separati da virgola).
     allowed-origins: ${ALLOWED_ORIGIN:http://localhost:5173,http://localhost:4173}

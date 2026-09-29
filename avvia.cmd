@@ -3,6 +3,14 @@ setlocal
 title Progetto base (locale)
 cd /d "%~dp0"
 
+rem ---------- PostgreSQL: serve il database BUILD-WEEK-5 sulla 5432 ----------
+rem DB_URL del progetto: una variabile rimasta da un altro progetto avrebbe la
+rem precedenza su application.yml e il backend si collegherebbe al db sbagliato.
+set "DB_URL=jdbc:postgresql://localhost:5432/BUILD-WEEK-5"
+powershell -NoProfile -Command "$c=New-Object Net.Sockets.TcpClient; try { $c.Connect('localhost',5432); exit 0 } catch { exit 1 }" >nul 2>&1
+if errorlevel 1 (
+  echo [postgres] porta 5432 chiusa: il backend non partira'.
+  echo            createdb -U postgres BUILD-WEEK-5
 rem ---------- PostgreSQL: serve il database progetto_base sulla 5432 ----------
 powershell -NoProfile -Command "$c=New-Object Net.Sockets.TcpClient; try { $c.Connect('localhost',5432); exit 0 } catch { exit 1 }" >nul 2>&1
 if errorlevel 1 (
