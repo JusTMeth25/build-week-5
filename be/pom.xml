@@ -14,6 +14,10 @@
 	<version>0.0.1-SNAPSHOT</version>
 	<name>piattaforma-eventi</name>
 	<description>Piattaforma di gestione eventi</description>
+	<artifactId>progetto-base</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<name>progetto-base</name>
+	<description>Base di partenza BE + FE + PostgreSQL, pronta per Render</description>
 
 	<properties>
 		<java.version>25</java.version>
