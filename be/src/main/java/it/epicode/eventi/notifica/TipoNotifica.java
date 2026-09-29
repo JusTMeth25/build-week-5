@@ -1,0 +1,9 @@
+package it.epicode.eventi.notifica;
+
+public enum TipoNotifica {
+	EVENTO_MODIFICATO,
+	MESSAGGIO_PROPRIETARIO,
+	NUOVA_ISCRIZIONE,
+	RICHIESTA_AMICIZIA,
+	AMICIZIA_ACCETTATA
+}
