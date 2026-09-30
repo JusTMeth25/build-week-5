@@ -2,7 +2,10 @@ package it.epicode.eventi.evento;
 
 import it.epicode.eventi.ai.MiglioratoreDescrizione;
 import it.epicode.eventi.comune.eccezioni.OperazioneNonConsentita;
+import it.epicode.eventi.comune.eccezioni.RichiestaNonValida;
 import it.epicode.eventi.comune.eccezioni.RisorsaNonTrovata;
+import it.epicode.eventi.geocoding.Coordinate;
+import it.epicode.eventi.geocoding.ServizioGeocodifica;
 import it.epicode.eventi.evento.web.RichiestaEvento;
 import it.epicode.eventi.evento.web.RispostaDescrizione;
 import it.epicode.eventi.evento.web.RispostaEvento;
@@ -26,15 +29,18 @@ public class ServizioEventi {
 	private final EventoRepository eventi;
 	private final ArtistaRepository artisti;
 	private final MiglioratoreDescrizione miglioratore;
+	private final ServizioGeocodifica geocodifica;
 	private final ApplicationEventPublisher pubblicatore;
 
 	public ServizioEventi(EventoRepository eventi,
 			ArtistaRepository artisti,
 			MiglioratoreDescrizione miglioratore,
+			ServizioGeocodifica geocodifica,
 			ApplicationEventPublisher pubblicatore) {
 		this.eventi = eventi;
 		this.artisti = artisti;
 		this.miglioratore = miglioratore;
+		this.geocodifica = geocodifica;
 		this.pubblicatore = pubblicatore;
 	}
 
@@ -114,13 +120,30 @@ public class ServizioEventi {
 		evento.setDataEvento(richiesta.dataEvento());
 		evento.setLuogo(richiesta.luogo());
 		evento.setIndirizzo(richiesta.indirizzo());
-		evento.setLatitudine(richiesta.latitudine());
-		evento.setLongitudine(richiesta.longitudine());
+		applicaCoordinate(richiesta, evento);
 		evento.setCapienza(richiesta.capienza());
 
 		aggiornaArtisti(richiesta.artisti(), evento);
 		aggiornaImmagini(richiesta.immagini(), evento);
 		aggiornaMarker(richiesta.marker(), evento);
+	}
+
+	// Coordinate esplicite se fornite, altrimenti geocoding dall'indirizzo (o dal luogo).
+	private void applicaCoordinate(RichiestaEvento richiesta, Evento evento) {
+		if (richiesta.latitudine() != null && richiesta.longitudine() != null) {
+			evento.setLatitudine(richiesta.latitudine());
+			evento.setLongitudine(richiesta.longitudine());
+			return;
+		}
+		String indirizzo = richiesta.indirizzo() != null && !richiesta.indirizzo().isBlank()
+				? richiesta.indirizzo()
+				: richiesta.luogo();
+		Coordinate coordinate = geocodifica.coordinate(indirizzo)
+				.orElseThrow(() -> new RichiestaNonValida(
+						"Impossibile ricavare le coordinate: fornisci latitudine e longitudine "
+								+ "oppure un indirizzo valido"));
+		evento.setLatitudine(coordinate.latitudine());
+		evento.setLongitudine(coordinate.longitudine());
 	}
 
 	private void aggiornaArtisti(List<String> nomi, Evento evento) {

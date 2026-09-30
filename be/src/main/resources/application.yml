@@ -69,6 +69,9 @@ app:
     abilitata: ${AI_ABILITATA:true}
     modello: "${AI_MODELLO:nvidia/nemotron-nano-9b-v2:free}"
     chiave: ${OPENROUTER_API_KEY:}
+  geocoding:
+    abilitato: ${GEOCODING_ABILITATO:true}
+    chiave: ${GOOGLE_MAPS_API_KEY:}
   verifica:
     durata-codice-minuti: 15
   sicurezza:
