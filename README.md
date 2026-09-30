@@ -22,6 +22,7 @@ Stato: **backend completo**, frontend ancora allo scheletro di partenza.
 | [docs/03-piano-di-sviluppo.md](docs/03-piano-di-sviluppo.md) | divisione del lavoro, flusso Git, calendario |
 | [docs/04-api.md](docs/04-api.md) | tutti gli endpoint del backend |
 | [docs/05-privacy.md](docs/05-privacy.md) | dati trattati, anonimizzazione, conservazione |
+| [docs/diagramma-er.webp](docs/diagramma-er.webp) | diagramma entità-relazioni |
 
 ## Avvio in locale
 
@@ -29,33 +30,41 @@ Stato: **backend completo**, frontend ancora allo scheletro di partenza.
    ```
    createdb -U postgres BUILD-WEEK-5
    ```
-2. `./avvia.sh` (macOS/Linux) oppure doppio clic su `avvia.cmd` (Windows).
+2. Imposta almeno `JWT_SECRET` (obbligatoria). Email, AI e geocoding possono restare
+   spenti in locale: il codice di verifica si legge dal log del backend.
+3. `./avvia.sh` (macOS/Linux) oppure doppio clic su `avvia.cmd` (Windows).
    Lo script fissa `DB_URL` sul database del progetto, controlla la 5432, installa le
    dipendenze del frontend al primo avvio e lancia backend e frontend insieme.
-3. Indirizzi: applicazione su http://localhost:5173, stato su
+4. Indirizzi: applicazione su http://localhost:5173, stato su
    http://localhost:8080/api/stato, salute su http://localhost:8080/actuator/health.
 
 Il primo avvio crea le tabelle da solo: lo schema è generato dalle entità JPA.
 
 ## Configurazione
 
+I segreti non stanno nel codice: si passano da variabili d'ambiente (i valori dopo
+i due punti in `application.yml` sono i default locali).
+
 | Variabile | Valore predefinito | A cosa serve |
 |---|---|---|
+| `JWT_SECRET` | vuota (**obbligatoria**) | segreto per firmare i token JWT (almeno 256 bit) |
 | `DB_URL` | `jdbc:postgresql://localhost:5432/BUILD-WEEK-5` | database |
 | `DB_USERNAME` / `DB_PASSWORD` | `postgres` / `admin` | credenziali del database |
 | `ALLOWED_ORIGIN` | `http://localhost:5173,http://localhost:4173` | origini ammesse per CORS e WebSocket |
-| `COOKIE_SECURE` | `false` | cookie di sessione solo su HTTPS: `true` in produzione |
-| `MAIL_ABILITATO` | `false` | con `false` le email finiscono nel log invece di partire |
+| `GOOGLE_MAPS_API_KEY` | vuota | geocoding: ricava le coordinate dall'indirizzo dell'evento |
+| `GEOCODING_ABILITATO` | `true` | con `false` disattiva il geocoding |
+| `MAIL_ABILITATO` | `true` | con `false` le email finiscono nel log invece di partire |
 | `MAIL_HOST` / `MAIL_PORT` | `smtp.gmail.com` / `587` | server SMTP |
 | `MAIL_USERNAME` / `MAIL_PASSWORD` | vuoti | account Gmail e password per le app |
 | `MAIL_FROM` | `no-reply@piattaforma-eventi.it` | mittente delle email |
-| `AI_ABILITATA` | `false` | attiva il miglioramento della descrizione |
-| `AI_MODELLO` | `claude-opus-5` | modello usato per la riscrittura |
-| `ANTHROPIC_API_KEY` | vuota | chiave del servizio AI |
+| `AI_ABILITATA` | `true` | attiva il miglioramento della descrizione |
+| `AI_MODELLO` | `nvidia/nemotron-nano-9b-v2:free` | modello usato per la riscrittura (via OpenRouter) |
+| `OPENROUTER_API_KEY` | vuota | chiave del servizio AI (OpenRouter) |
 
-Se nel terminale è presente una `DB_URL` di un altro progetto, avviare il backend a
-mano con `./mvnw spring-boot:run` lo farebbe collegare al database sbagliato: `avvia.sh`
-e `avvia.cmd` impostano la variabile del progetto e risolvono il problema.
+L'autenticazione è con token JWT: nessuna sessione lato server e nessun cookie di
+sessione. Se nel terminale è presente una `DB_URL` di un altro progetto, avviare il
+backend a mano con `./mvnw spring-boot:run` lo farebbe collegare al database sbagliato:
+`avvia.sh` e `avvia.cmd` impostano la variabile del progetto e risolvono il problema.
 
 ## Collaudo del backend
 
@@ -67,19 +76,19 @@ Con backend e database avviati:
 
 Lo script percorre tutto il funzionale, dagli endpoint pubblici all'anonimizzazione,
 e confronta lo stato HTTP atteso con quello ottenuto. Il file di log serve solo a
-leggere il codice di verifica quando `MAIL_ABILITATO=false`. Ultimo esito: 55 controlli
-superati su 55.
+leggere il codice di verifica quando `MAIL_ABILITATO=false`.
 
 ## Struttura del backend
 
 ```
 be/src/main/java/it/epicode/eventi/
   PiattaformaEventiApplication.java
-  config/         sicurezza, CORS, WebSocket, invio asincrono, URL del database
+  config/         sicurezza (JWT), CORS, WebSocket, invio asincrono, URL del database
   comune/         eccezioni di dominio, gestione errori, sanificazione del testo
-  utente/         anagrafica, registrazione, verifica, sessione, profilo
+  utente/         anagrafica, registrazione, verifica, login con token JWT, profilo
   evento/         eventi, immagini, artisti, marker
-  ai/             miglioramento della descrizione
+  geocoding/      indirizzo -> coordinate (Google Geocoding)
+  ai/             miglioramento della descrizione (OpenRouter)
   ticket/         emissione e gestione dei ticket
   notifica/       notifiche persistenti e consegna in tempo reale
   amicizia/       partecipanti, richieste di amicizia
@@ -104,7 +113,10 @@ Il dettaglio delle regole è in [docs/03-piano-di-sviluppo.md](docs/03-piano-di-
    | Servizio | Variabile | Valore |
    |---|---|---|
    | `app-be` | `ALLOWED_ORIGIN` | `https://app-fe.onrender.com` |
+   | `app-be` | `JWT_SECRET` | segreto lungo e casuale |
+   | `app-be` | `GOOGLE_MAPS_API_KEY` | chiave Google (se serve il geocoding) |
+   | `app-be` | `OPENROUTER_API_KEY` | chiave OpenRouter (se serve l'AI) |
    | `app-fe` | `VITE_API_URL` | `https://app-be.onrender.com` |
 
-4. In produzione servono anche `COOKIE_SECURE=true` e le variabili del mailing.
+4. Impostare anche le variabili del mailing se le email devono partire davvero.
 5. **Manual Deploy** di entrambi: `VITE_API_URL` è letta in fase di build.
