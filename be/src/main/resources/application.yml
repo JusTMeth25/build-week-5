@@ -67,7 +67,7 @@ app:
     abilitato: ${MAIL_ABILITATO:true}
   ai:
     abilitata: ${AI_ABILITATA:true}
-    modello: "${AI_MODELLO:nvidia/nemotron-nano-9b-v2:free}"
+    modello: "${AI_MODELLO:nvidia/nemotron-3.5-lightning:free}"
     chiave: ${OPENROUTER_API_KEY:}
   geocoding:
     abilitato: ${GEOCODING_ABILITATO:true}
