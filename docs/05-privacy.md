@@ -13,10 +13,11 @@ pubbliche di cookie policy e privacy policy si scrivono su questo contenuto.
 | Indirizzo, data di nascita, telefono | registrazione | anagrafica richiesta dalla consegna |
 | Posizione geografica | mappa, solo con consenso del browser | ordinare gli eventi per vicinanza |
 | Eventi creati, ticket, amicizie, messaggi | uso della piattaforma | funzionamento del servizio |
-| Cookie di sessione | login | mantenere la sessione autenticata |
-| Cookie del token CSRF | login | protezione dalle richieste inviate da altri siti |
+| Token di accesso (JWT) | login | autenticare le richieste successive; contiene id, email e ruolo, scade dopo 120 minuti |
 
-Nessun cookie di profilazione, nessun servizio di analisi di terze parti.
+Il token JWT non è un cookie: lo conserva il client e lo invia nell'header
+`Authorization`. Nessun cookie di sessione, nessun cookie di profilazione, nessun
+servizio di analisi di terze parti.
 
 ## 2. Posizione geografica
 
@@ -60,12 +61,12 @@ dati altrui restino coerenti, senza più alcun riferimento alla persona.
 | Dato | Conservazione |
 |---|---|
 | Codici di verifica | 15 minuti, poi inutilizzabili |
-| Sessione | fino al logout o alla scadenza della sessione |
+| Token di accesso (JWT) | valido fino alla scadenza (120 minuti); non conservato lato server |
 | Account e contenuti | fino alla richiesta di anonimizzazione |
 
 ## 6. Sicurezza applicata
 
-Password con hash BCrypt, sessione su cookie `HttpOnly`, protezione CSRF,
+Password con hash BCrypt, autenticazione con token JWT (HS256) e API stateless,
 CORS limitato alle origini dichiarate, escape delle stringhe in ingresso contro
 XSS, query sempre parametrizzate contro SQL injection, controlli di
 autorizzazione nel backend su ogni risorsa.

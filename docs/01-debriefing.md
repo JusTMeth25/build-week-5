@@ -15,21 +15,24 @@ backend e frontend). Non è stata valutata nessuna alternativa allo stack.
 
 ## 2. Decisioni prese
 
-### 2.1 Sessione autenticata, non JWT
+### 2.1 Autenticazione con token JWT (stateless)
 
-**Scelta:** autenticazione con sessione server (`HttpSession`) e cookie di
-sessione `HttpOnly`, protezione CSRF con token in cookie leggibile dal
-frontend e header `X-XSRF-TOKEN`.
+**Scelta:** autenticazione con token JWT. Il login restituisce un token firmato
+HS256 (chiave da `JWT_SECRET`, almeno 256 bit) che contiene id, email e ruolo e
+scade dopo `app.sicurezza.jwt.scadenza-minuti` (120 di default). Il client lo
+invia su ogni richiesta protetta in `Authorization: Bearer <token>`. L'API è
+stateless (`SessionCreationPolicy.STATELESS`), la protezione CSRF è disattivata e
+non esiste un endpoint di logout.
 
-**Perché:** la consegna chiede esplicitamente "login e logout con sessione
-autenticata" e, nella parte sulla sicurezza, la protezione CSRF. Le due cose
-vanno insieme: il CSRF è un problema solo quando il browser allega da sé la
-credenziale, cioè con i cookie.
+**Perché:** senza sessione lato server il backend non deve conservare stato e
+scala senza appiccicarsi a una singola istanza; il token nell'header, non in un
+cookie inviato in automatico dal browser, toglie in radice il problema CSRF. Il
+controllo delle autorizzazioni resta nei servizi.
 
-**Alternativa scartata:** JWT in `localStorage`. Scartata perché non è una
-sessione, rende il logout lato server un problema (il token resta valido fino
-alla scadenza) ed è esposta a XSS, dato che qualunque script della pagina può
-leggere `localStorage`.
+**Conseguenza accettata:** il logout è lato client (si scarta il token) e un token
+già emesso resta valido fino alla scadenza; per questo la scadenza è breve. Il
+token non va salvato dove uno script di pagina può leggerlo (rischio XSS): sul
+frontend va tenuto in memoria, non in `localStorage`.
 
 ### 2.2 Ticket con dati denormalizzati
 
@@ -182,5 +185,5 @@ deve valere sul server, non dipendere dall'interfaccia.
 | Conflitti Git su branch paralleli | branch per funzionalità, merge frequenti su `develop`, nessuno sviluppo diretto su `main` |
 | Deriva fra documenti e codice | i documenti si aggiornano nello stesso commit che cambia la scelta |
 | Tentativi di password a ripetizione sul login | **non ancora coperto**: non c'è un limite ai tentativi. Va aggiunto un blocco temporaneo per email e per indirizzo IP prima di qualunque uso reale |
-| Sessioni in memoria | un riavvio del backend fa decadere tutte le sessioni. Accettabile in sviluppo; in produzione servirebbe Spring Session su database o Redis |
+| Token JWT non revocabili | l'API è stateless: un token già emesso resta valido fino alla scadenza, anche dopo un cambio password o l'anonimizzazione. Mitigato dalla scadenza breve; una revoca immediata richiederebbe una blocklist dei token |
 | Nessun test automatico | il backend è verificato con `collaudo/collaudo-backend.sh`, che confronta gli stati HTTP attesi su tutto il percorso funzionale. I test di unità e di integrazione restano da scrivere |

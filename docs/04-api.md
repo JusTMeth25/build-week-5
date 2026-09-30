@@ -13,8 +13,10 @@ Tutte le risposte sono JSON. Gli errori seguono lo stesso formato:
 }
 ```
 
-Le richieste che modificano dati richiedono la sessione autenticata e l'header
-`X-XSRF-TOKEN` con il valore del cookie `XSRF-TOKEN`.
+L'autenticazione è con token JWT: il login restituisce il token, che va inviato
+sulle richieste protette nell'header `Authorization: Bearer <token>`. L'API è
+stateless (nessuna sessione lato server) e senza CSRF, perché il token viaggia
+nell'header e non in un cookie inviato in automatico dal browser.
 
 Ogni sezione viene compilata dall'autore della funzionalità corrispondente,
 nello stesso commit che introduce gli endpoint.
@@ -30,13 +32,11 @@ nello stesso commit che introduce gli endpoint.
 
 | Metodo | Percorso | Accesso | Descrizione |
 |---|---|---|---|
-| GET | `/api/auth/csrf` | pubblico | restituisce il token CSRF e imposta il cookie `XSRF-TOKEN` |
 | POST | `/api/auth/registrazione` | pubblico | crea l'account e invia il codice di conferma. `201` |
 | POST | `/api/auth/verifica` | pubblico | conferma l'account con il codice a sei cifre. `204` |
 | POST | `/api/auth/codice` | pubblico | reinvia il codice di conferma. `204` |
-| POST | `/api/auth/login` | pubblico | apre la sessione autenticata |
-| POST | `/api/auth/logout` | autenticato | chiude la sessione e cancella il cookie. `204` |
-| GET | `/api/auth/io` | autenticato | dati dell'utente della sessione |
+| POST | `/api/auth/login` | pubblico | verifica le credenziali e restituisce il token JWT |
+| GET | `/api/auth/io` | autenticato | dati dell'utente del token |
 | GET | `/api/utenti/me` | autenticato | profilo |
 | PUT | `/api/utenti/me` | autenticato | aggiorna anagrafica e coordinate |
 
@@ -59,6 +59,20 @@ L'età non si invia: si calcola da `dataNascita`.
 
 Un account non verificato che tenta il login riceve `403` con il messaggio che
 invita a inserire il codice: la piattaforma resta inaccessibile fino alla conferma.
+
+Risposta del login:
+
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiJ9...",
+  "utente": { "id": 1, "email": "lorenzo@example.com", "nome": "Lorenzo", "cognome": "Rossi", "ruolo": "UTENTE", "verificato": true }
+}
+```
+
+Il token è un JWT firmato HS256, contiene id, email e ruolo e scade dopo
+`app.sicurezza.jwt.scadenza-minuti` (120 minuti di default). Non esiste un endpoint
+di logout: essendo l'API stateless, il logout è lato client (si scarta il token) e
+il token perde validità alla scadenza.
 
 ## Eventi
 
@@ -195,13 +209,13 @@ valido di quell'evento.
 | Voce | Valore |
 |---|---|
 | Endpoint | `ws://localhost:8080/ws` (STOMP, senza SockJS) |
-| Autenticazione | cookie di sessione inviato nell'handshake |
+| Autenticazione | token JWT nell'header nativo `Authorization: Bearer <token>` del frame STOMP CONNECT |
 | Coda delle notifiche | `/utente/queue/notifiche` |
 | Prefisso dei messaggi in ingresso | `/app` |
 
 La sottoscrizione è personale: il broker consegna a ciascuno solo la propria coda,
 la destinazione non contiene l'identificativo dell'utente e non è indovinabile.
-Senza sessione valida l'handshake viene rifiutato.
+Senza token valido la connessione viene rifiutata.
 
 ## Partecipanti e amicizie
 
@@ -296,8 +310,8 @@ associati e mai concatenati; serve solo a ordinare.
 
 Servono entrambi i campi: la password perché l'operazione è irreversibile, `confermo`
 perché comporta la disattivazione dell'account. Senza conferma o con password errata la
-risposta è `400` e nulla viene toccato. Al termine la sessione viene invalidata e
-l'account non permette più l'accesso.
+risposta è `400` e nulla viene toccato. Al termine l'account è disattivato e non
+consente più il login; un token già emesso resta valido fino alla sua scadenza.
 
 Effetto misurato in locale su un utente con un ticket:
 
@@ -314,8 +328,8 @@ messaggi: contenuto rimosso
 
 | Protezione | Come |
 |---|---|
-| Sessioni | cookie `SESSIONE` `HttpOnly`, `SameSite=Lax`, rigenerato al login, invalidato al logout |
-| CSRF | token in cookie `XSRF-TOKEN` leggibile dal frontend, atteso nell'header `X-XSRF-TOKEN` su ogni richiesta che modifica dati |
+| Autenticazione | token JWT firmato HS256 (chiave da `JWT_SECRET`, almeno 256 bit), inviato in `Authorization: Bearer`; API stateless, nessuna sessione lato server |
+| CSRF | non applicabile: il token viaggia nell'header, non in un cookie inviato in automatico dal browser, quindi la protezione CSRF è disattivata |
 | CORS | solo le origini di `ALLOWED_ORIGIN`, con credenziali, header e metodi dichiarati uno per uno |
 | XSS | ogni stringa in ingresso viene ripulita in deserializzazione, più `Content-Security-Policy: default-src 'none'` |
 | SQL injection | solo JPQL e query native con parametri associati: nessuna concatenazione di stringhe in SQL |

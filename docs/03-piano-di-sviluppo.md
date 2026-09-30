@@ -30,8 +30,8 @@ Regole condivise:
 Branch: `feature/be-fondamenta`, `feature/be-sicurezza-privacy`
 
 - Struttura del progetto, dipendenze, configurazione `application.yml`, database locale.
-- Spring Security: catena dei filtri, sessione autenticata, logout, gerarchia dei ruoli.
-- Protezione CSRF con token in cookie, CORS sulle origini dichiarate, intestazioni di sicurezza, Content-Security-Policy.
+- Spring Security: catena dei filtri, autenticazione JWT stateless, gerarchia dei ruoli.
+- CORS sulle origini dichiarate, intestazioni di sicurezza, Content-Security-Policy (CSRF disattivato: auth stateless con token nell'header).
 - Pulizia in ingresso di tutte le stringhe contro XSS, validazione dei DTO.
 - Gestione centralizzata degli errori con risposte uniformi.
 - Anonimizzazione dei dati e disattivazione dell'account.
@@ -44,7 +44,7 @@ Branch: `feature/be-autenticazione`
 - Entità `Utente`, ruoli, anagrafica completa (nome, cognome, indirizzo, data di nascita, telefono).
 - Registrazione con email, password cifrata con BCrypt, dati anagrafici.
 - Generazione e verifica del codice di conferma, scadenza, reinvio.
-- Login e logout su sessione, endpoint del profilo, blocco degli account non verificati.
+- Login con emissione del token JWT, endpoint del profilo, blocco degli account non verificati.
 - Test manuali documentati della sequenza registrazione → verifica → login.
 
 ### Marco — Gestione eventi e AI (Parte 2, prima metà)
@@ -90,7 +90,7 @@ Si apre quando il backend della parte corrispondente è unito su `develop`.
 | Marco | `feature/fe-eventi` | creazione e modifica evento, caricamento immagini, artisti, pulsante di miglioramento AI |
 | Simone | `feature/fe-ticket-notifiche` | pagina dei propri ticket, campanello delle notifiche live |
 | Gianluca | `feature/fe-mappa-chat` | mappa pubblica con marker e anteprima, elenco partecipanti, amicizie, chat live |
-| Javier | `feature/fe-impalcatura` | routing, client HTTP con CSRF, layout, pagine cookie policy e privacy policy |
+| Javier | `feature/fe-impalcatura` | routing, client HTTP con token JWT, layout, pagine cookie policy e privacy policy |
 
 ## 4. Documentazione
 
