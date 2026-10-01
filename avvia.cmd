@@ -16,13 +16,6 @@ if errorlevel 1 (
   echo [postgres] in ascolto sulla 5432.
 )
 
-rem ---------- Controlli variabili obbligatorie/sensibili ----------
-powershell -NoProfile -Command "if (-not $env:JWT_SECRET -or $env:JWT_SECRET.Length -lt 32) { exit 1 } else { exit 0 }" >nul 2>&1
-if errorlevel 1 (
-  echo [config] JWT_SECRET mancante o troppo corto: il backend non partira'.
-  echo          Impostalo nelle variabili d'ambiente utente o macchina.
-)
-
 if not exist "fe\node_modules" (
   echo [FE] npm install...
   pushd fe
