@@ -23,56 +23,16 @@ import {
   Wand2,
   Zap,
 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, NavLink, Route, Routes, useNavigate, useParams } from 'react-router-dom'
 import { EventSphere } from '@/components/EventSphere'
+import MapDashboard from '@/components/mappa/MapDashboard'
 import { Area, Badge, Button, Card, Field, Reveal } from '@/components/ui'
 import { useAuth } from '@/context/AuthContext'
 import { api, type Amicizia, type EventoInput, type EventoMappa, type EventoSintesi, type Messaggio, type Notifica, type Stato, type Ticket as TicketType } from '@/lib/api'
 import { cn, dataBella, giorno, iniziali } from '@/lib/utils'
 
 const fallbackImage = 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=1400&auto=format&fit=crop'
-const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined
-
-type GoogleMapsApi = typeof google.maps
-let promessaGoogleMaps: Promise<GoogleMapsApi> | null = null
-
-const stileGoogleMapsNeon: google.maps.MapTypeStyle[] = [
-  { elementType: 'geometry', stylers: [{ color: '#07111f' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#020617' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#94a3b8' }] },
-  { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#e0f2fe' }] },
-  { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#67e8f9' }] },
-  { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#064e3b' }] },
-  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#164e63' }] },
-  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#22d3ee' }, { weight: 0.7 }] },
-  { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#cffafe' }] },
-  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#0e7490' }] },
-  { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#a855f7' }, { weight: 1.2 }] },
-  { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#1e293b' }] },
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#082f49' }] },
-  { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#7dd3fc' }] },
-]
-
-function caricaGoogleMaps() {
-  if (!GOOGLE_MAPS_API_KEY) return Promise.reject(new Error('Configura GOOGLE_MAPS_API_KEY oppure VITE_GOOGLE_MAPS_API_KEY per usare Google Maps.'))
-  if (window.google?.maps) return Promise.resolve(window.google.maps)
-  if (promessaGoogleMaps) return promessaGoogleMaps
-  promessaGoogleMaps = new Promise((resolve, reject) => {
-    const callback: `__eventVerseGoogleMapsReady_${string}` = `__eventVerseGoogleMapsReady_${Date.now()}`
-    window[callback] = () => {
-      delete window[callback]
-      resolve(window.google.maps)
-    }
-    const script = document.createElement('script')
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(GOOGLE_MAPS_API_KEY)}&callback=${callback}&v=weekly`
-    script.async = true
-    script.defer = true
-    script.onerror = () => reject(new Error('Impossibile caricare Google Maps. Controlla chiave, billing e referrer autorizzati.'))
-    document.head.appendChild(script)
-  })
-  return promessaGoogleMaps
-}
 
 function useAsync<T>(loader: () => Promise<T>, deps: unknown[] = []) {
   const [data, setData] = useState<T | null>(null)
@@ -297,183 +257,8 @@ function Dashboard() {
 }
 function Metric({ label, value }: { label: string; value: string | number }) { return <Card><p className="text-sm text-slate-400">{label}</p><p className="mt-2 text-4xl font-black">{value}</p></Card> }
 
-function contenutoInfoEvento(evento: EventoMappa) {
-  const root = document.createElement('div')
-  root.className = 'eventverse-map-popup'
-
-  const img = document.createElement('img')
-  img.src = evento.immaginePrincipale || fallbackImage
-  img.alt = ''
-  root.appendChild(img)
-
-  const kicker = document.createElement('div')
-  kicker.className = 'eventverse-map-popup__kicker'
-  kicker.textContent = 'Evento EventVerse'
-  root.appendChild(kicker)
-
-  const titolo = document.createElement('h3')
-  titolo.textContent = evento.titolo
-  root.appendChild(titolo)
-
-  const meta = document.createElement('p')
-  meta.textContent = `${dataBella(evento.dataEvento)} · ${evento.luogo}`
-  root.appendChild(meta)
-
-  const link = document.createElement('a')
-  link.href = `/eventi/${evento.id}`
-  link.textContent = 'Dettagli e ticket'
-  root.appendChild(link)
-
-  return root
-}
-
 function Mappa() {
-  const [selezionatoId, setSelezionatoId] = useState<number | null>(null)
-  const [erroreMappa, setErroreMappa] = useState<string | null>(null)
-  const contenitoreMappa = useRef<HTMLDivElement | null>(null)
-  const istanzaMappa = useRef<google.maps.Map | null>(null)
-  const markerMappa = useRef<google.maps.Marker[]>([])
-  const finestraInfo = useRef<google.maps.InfoWindow | null>(null)
-  const eventi = useAsync<EventoMappa[]>(() => new Promise<EventoMappa[]>((resolve, reject) => {
-    const caricaSenzaPosizione = () => api.mappa().then(resolve).catch(reject)
-    if (!navigator.geolocation) {
-      caricaSenzaPosizione()
-      return
-    }
-    navigator.geolocation.getCurrentPosition(
-      pos => api.mappa(pos.coords.latitude, pos.coords.longitude).then(resolve).catch(caricaSenzaPosizione),
-      caricaSenzaPosizione,
-      { enableHighAccuracy: true, timeout: 5000, maximumAge: 120000 },
-    )
-  }), [])
-
-  const punti = useMemo(() => (eventi.data ?? []).filter(e => Number.isFinite(e.latitudine) && Number.isFinite(e.longitudine)), [eventi.data])
-  const selezionato = punti.find(e => e.id === selezionatoId) ?? null
-  const centro = useMemo(() => {
-    if (!punti.length) return { latitudine: 45.4642, longitudine: 9.19 }
-    return {
-      latitudine: punti.reduce((somma, e) => somma + e.latitudine, 0) / punti.length,
-      longitudine: punti.reduce((somma, e) => somma + e.longitudine, 0) / punti.length,
-    }
-  }, [punti])
-
-  useEffect(() => {
-    let annullato = false
-    if (!contenitoreMappa.current) return
-    caricaGoogleMaps()
-      .then(maps => {
-        if (annullato || !contenitoreMappa.current) return
-        if (!istanzaMappa.current) {
-          istanzaMappa.current = new maps.Map(contenitoreMappa.current, {
-            center: { lat: centro.latitudine, lng: centro.longitudine },
-            zoom: punti.length > 1 ? 12 : 14,
-            minZoom: 3,
-            maxZoom: 19,
-            mapTypeControl: false,
-            streetViewControl: true,
-            fullscreenControl: true,
-            clickableIcons: true,
-            gestureHandling: 'greedy',
-            backgroundColor: '#020617',
-            styles: stileGoogleMapsNeon,
-          })
-          finestraInfo.current = new maps.InfoWindow({ maxWidth: 320 })
-        }
-      })
-      .catch(e => setErroreMappa(e instanceof Error ? e.message : String(e)))
-    return () => { annullato = true }
-  }, [centro.latitudine, centro.longitudine, punti.length])
-
-  useEffect(() => {
-    let annullato = false
-    caricaGoogleMaps()
-      .then(maps => {
-        if (annullato || !istanzaMappa.current) return
-        markerMappa.current.forEach(marker => marker.setMap(null))
-        markerMappa.current = []
-        const bounds = new maps.LatLngBounds()
-        punti.forEach((evento, indice) => {
-          const posizione = { lat: evento.latitudine, lng: evento.longitudine }
-          bounds.extend(posizione)
-          const marker = new maps.Marker({
-            map: istanzaMappa.current,
-            position: posizione,
-            title: evento.titolo,
-            label: { text: String(indice + 1), color: '#020617', fontWeight: '900' },
-            icon: {
-              path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7Z',
-              fillColor: '#67e8f9',
-              fillOpacity: 1,
-              strokeColor: '#ffffff',
-              strokeWeight: 2,
-              scale: 1.9,
-              labelOrigin: new maps.Point(12, 10),
-              anchor: new maps.Point(12, 24),
-            },
-          })
-          marker.addListener('click', () => {
-            setSelezionatoId(evento.id)
-            finestraInfo.current?.setContent(contenutoInfoEvento(evento))
-            finestraInfo.current?.open({ map: istanzaMappa.current!, anchor: marker })
-          })
-          markerMappa.current.push(marker)
-        })
-        if (punti.length > 1) istanzaMappa.current.fitBounds(bounds, 80)
-        if (punti.length === 1) istanzaMappa.current.panTo({ lat: punti[0].latitudine, lng: punti[0].longitudine })
-      })
-      .catch(e => setErroreMappa(e instanceof Error ? e.message : String(e)))
-    return () => { annullato = true }
-  }, [punti])
-
-  function centraEvento(evento: EventoMappa) {
-    setSelezionatoId(evento.id)
-    istanzaMappa.current?.panTo({ lat: evento.latitudine, lng: evento.longitudine })
-  }
-
-  return (
-    <Shell>
-      <PageTitle icon={Globe2} title="Mappa eventi" subtitle="Google Maps in stile neon: pan, zoom, strade reali e pin degli eventi." />
-      <StatusBox {...eventi} />
-      <div className="grid gap-6 xl:grid-cols-[1.25fr_.75fr]">
-        <Card className="relative min-h-[680px] overflow-hidden p-0">
-          <div ref={contenitoreMappa} className="absolute inset-0 bg-slate-950" />
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_42%,transparent_0,transparent_60%,rgba(2,6,23,.56)_92%)]" />
-          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(34,211,238,.06)_1px,transparent_1px),linear-gradient(90deg,rgba(34,211,238,.06)_1px,transparent_1px)] bg-[length:72px_72px] mix-blend-screen" />
-          <div className="pointer-events-none absolute left-5 top-5 z-20 rounded-3xl border border-white/10 bg-slate-950/70 p-4 shadow-2xl shadow-black/30 backdrop-blur-xl">
-            <p className="text-xs font-black uppercase tracking-[.35em] text-cyan-200">Google Maps</p>
-            <p className="mt-2 text-2xl font-black">{punti.length} eventi</p>
-            <p className="text-xs text-slate-400">Pan, zoom, strade e dettagli urbani reali.</p>
-          </div>
-          {erroreMappa && <div className="absolute inset-0 z-30 grid place-items-center p-8 text-center"><div className="max-w-lg rounded-[2rem] border border-rose-300/30 bg-rose-950/80 p-8 text-rose-50 backdrop-blur-xl"><MapPin className="mx-auto mb-4 size-10" /><h3 className="text-2xl font-black">Google Maps non disponibile</h3><p className="mt-3 text-sm">{erroreMappa}</p></div></div>}
-          {!punti.length && !eventi.loading && !erroreMappa && <div className="absolute inset-0 z-20 grid place-items-center p-8 text-center"><div className="max-w-md rounded-[2rem] border border-white/10 bg-slate-950/80 p-8 backdrop-blur-xl"><MapPin className="mx-auto mb-4 size-10 text-cyan-200" /><h3 className="text-2xl font-black">Nessun evento geolocalizzato</h3><p className="mt-3 text-slate-400">Crea eventi con coordinate manuali oppure abilita Google Geocoding per popolare la mappa.</p></div></div>}
-          {selezionato && (
-            <div className="absolute bottom-20 left-1/2 z-40 w-[min(34rem,calc(100%-2rem))] -translate-x-1/2 overflow-hidden rounded-[2rem] border border-cyan-300/30 bg-slate-950/85 shadow-2xl shadow-cyan-950/50 backdrop-blur-2xl">
-              <div className="grid grid-cols-[7rem_1fr] gap-4 p-3 sm:grid-cols-[9rem_1fr]">
-                <img src={selezionato.immaginePrincipale || fallbackImage} alt="" className="h-28 w-full rounded-[1.5rem] object-cover sm:h-32" />
-                <div className="min-w-0 py-1 pr-1">
-                  <div className="flex items-center justify-between gap-3">
-                    <Badge>{selezionato.distanzaKm != null ? `${selezionato.distanzaKm} km da te` : 'Evento'}</Badge>
-                    <button type="button" onClick={() => setSelezionatoId(null)} className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-black text-slate-300 hover:bg-white/10">Chiudi</button>
-                  </div>
-                  <h3 className="mt-3 truncate text-xl font-black leading-tight sm:text-2xl">{selezionato.titolo}</h3>
-                  <p className="mt-1 truncate text-sm text-slate-400">{dataBella(selezionato.dataEvento)} · {selezionato.luogo}</p>
-                  <p className="mt-2 text-xs text-cyan-100">Apri la pagina completa per dettagli e ticket.</p>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <Link to={`/eventi/${selezionato.id}`}><Button className="px-4 py-2"><Ticket className="size-4" /> Dettagli e ticket</Button></Link>
-                    <Button className="px-4 py-2" variant="glass" onClick={() => centraEvento(selezionato)}><MapPin className="size-4" /> Centra</Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </Card>
-        <div className="grid content-start gap-4">
-          {punti.map(e => <div key={e.id} onClick={() => centraEvento(e)} onFocus={() => setSelezionatoId(e.id)}><EventCard evento={e} /></div>)}
-          {!punti.length && !eventi.loading && <Card><p className="text-slate-300">Non ci sono ancora eventi con coordinate. Appena ne crei uno, comparira' sulla mappa.</p></Card>}
-        </div>
-      </div>
-    </Shell>
-  )
+  return <Shell><MapDashboard /></Shell>
 }
 function TicketPage() { const ticket = useAsync<TicketType[]>(() => api.ticket(), []); return <Protected><Shell><PageTitle icon={Ticket} title="Wallet ticket" subtitle="Tutti i tuoi pass digitali in una vista premium." /><StatusBox {...ticket} />{ticket.data?.length === 0 && <Card className="text-center"><QrCode className="mx-auto mb-4 size-12 text-cyan-200" /><h3 className="text-2xl font-black">Nessun ticket ancora</h3><p className="mt-2 text-slate-400">Esplora gli eventi e prenota il primo pass.</p><Link to="/eventi"><Button className="mt-5"><Compass className="size-4" /> Esplora eventi</Button></Link></Card>}<div className="grid gap-4 md:grid-cols-2">{ticket.data?.map(t => <Card key={t.id} className="relative overflow-hidden"><QrCode className="absolute right-5 top-5 size-20 text-white/10" /><Badge>{t.codice}</Badge><h3 className="mt-4 text-2xl font-black">{t.nomeEvento}</h3><p className="mt-2 text-slate-400">{dataBella(t.dataEvento)} · {t.luogoEvento}</p><Button className="mt-5" variant="danger" onClick={() => api.annullaTicket(t.id).then(ticket.reload)}>Annulla</Button></Card>)}</div></Shell></Protected> }
 
