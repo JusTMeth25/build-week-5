@@ -1,14 +1,8 @@
-# Blueprint Render: database + backend + frontend.
+# Blueprint Render: backend + frontend. Il database PostgreSQL e' esterno (Neon),
+# perche' l'account Render ha gia' usato il suo unico PostgreSQL gratuito.
 # Su Render: New > Blueprint > repository > Apply.
 # Se un nome e' gia' preso Render aggiunge un suffisso all'indirizzo: in quel caso
 # aggiornare ALLOWED_ORIGIN e VITE_API_URL qui sotto.
-
-databases:
-  - name: eventverse-db
-    databaseName: eventverse
-    user: eventverse
-    plan: free
-    region: frankfurt
 
 services:
   # ---------- Backend: Spring Boot via Docker ----------
@@ -27,9 +21,11 @@ services:
         - render.yaml
     envVars:
       - key: DATABASE_URL
-        fromDatabase:
-          name: eventverse-db
-          property: connectionString
+        # Connection string di Neon (postgresql://...): segreta, va nel pannello.
+        sync: false
+      # Indirizzo del FE usato nei pulsanti delle email.
+      - key: APP_URL
+        value: https://eventverse-fe.onrender.com
       # Origine del FE per il CORS.
       - key: ALLOWED_ORIGIN
         value: https://eventverse-fe.onrender.com

@@ -66,6 +66,8 @@ app:
   mail:
     # Gmail spedisce solo a nome dell'account autenticato: mittente e username coincidono.
     mittente: ${MAIL_FROM:eventverse379@gmail.com}
+    # Indirizzo del frontend, per i pulsanti nelle email (senza / finale).
+    url-applicazione: ${APP_URL:http://localhost:5173}
     abilitato: ${MAIL_ABILITATO:true}
   ai:
     # Spenta di default: chi non ha la chiave OpenRouter avvia comunque il progetto.
