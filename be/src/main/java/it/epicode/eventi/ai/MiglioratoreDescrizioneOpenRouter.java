@@ -8,6 +8,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.util.List;
 import java.util.Optional;
@@ -70,10 +71,24 @@ public class MiglioratoreDescrizioneOpenRouter implements MiglioratoreDescrizion
 				throw new RichiestaNonValida("Il servizio AI non ha restituito una descrizione");
 			}
 			return testo;
+		} catch (RestClientResponseException eccezione) {
+			log.error("Chiamata al servizio AI non riuscita: status={}, body={}",
+					eccezione.getStatusCode().value(), eccezione.getResponseBodyAsString());
+			throw new RichiestaNonValida(messaggioErroreOpenRouter(eccezione));
 		} catch (RestClientException eccezione) {
 			log.error("Chiamata al servizio AI non riuscita: {}", eccezione.getMessage());
 			throw new RichiestaNonValida("Il servizio AI non e' raggiungibile, riprova piu' tardi");
 		}
+	}
+
+	private String messaggioErroreOpenRouter(RestClientResponseException eccezione) {
+		int stato = eccezione.getStatusCode().value();
+		return switch (stato) {
+			case 401, 403 -> "Configurazione AI non valida: controlla OPENROUTER_API_KEY e le restrizioni dell'account";
+			case 404 -> "Il modello AI configurato non e' disponibile su OpenRouter: aggiorna AI_MODELLO";
+			case 429 -> "Limite OpenRouter raggiunto: attendi oppure scegli un modello/account con quota disponibile";
+			default -> "OpenRouter ha risposto con errore " + stato + ": riprova piu' tardi";
+		};
 	}
 
 	private record RichiestaChatCompletion(String model, List<Messaggio> messages) {

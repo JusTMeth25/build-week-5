@@ -1,5 +1,12 @@
 # Backend
 be/target/
+be/.env
+be/.env.local
+
+# Local secrets
+.env
+.env.local
+.env.*.local
 
 # Frontend
 fe/node_modules/

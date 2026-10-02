@@ -10,14 +10,14 @@ Backend Java con Spring Boot, frontend TypeScript con React, PostgreSQL, integra
 
 ## SCOSTAMENTI DAL MODELLO DI RIFERIMENTO
 
-Sei scelte divergono dal modello usato come base. Sono deliberate e motivate qui.
+Quattro scelte divergono dal modello usato come base. Sono deliberate e motivate qui.
+(Autenticazione JWT e provider AI OpenRouter coincidono con il modello di
+riferimento, quindi non sono scostamenti.)
 
 | Voce | Modello di riferimento | Questo progetto | Perché |
 |---|---|---|---|
 | Versione Java | Java 21 | **Java 25** con Spring Boot 4.1.1 | la consegna impone Spring Boot 4 su Java 25 |
-| Autenticazione | JWT | **sessione autenticata** con cookie `HttpOnly` + token CSRF | la consegna chiede "login e logout con sessione autenticata" e la protezione CSRF: le due cose stanno insieme. Un JWT in `localStorage` non è una sessione, non si revoca al logout ed è leggibile da qualunque script della pagina |
 | Lombok | previsto | **non adottato** | i DTO sono `record`, le entità hanno accessori espliciti. Aggiungere generazione di codice a progetto avviato non porta vantaggi e nasconde il contratto delle entità |
-| Provider AI | OpenRouter / OpenAI | **Anthropic Claude** (`claude-opus-5`) via SDK ufficiale Java | serve input multimodale (locandina + testo) in una sola chiamata, con SDK Java di prima parte |
 | Chiavi primarie | GUID | **BIGSERIAL** | chiavi corte e ordinate: indici più compatti e join più rapidi. Il codice pubblico del ticket è un UUID, perché quello sì circola fuori dal sistema |
 | Ruolo organizzatore | ruolo globale `ORGANIZER` | **proprietà per evento** (`eventi.proprietario_id`) più ruoli `UTENTE` / `AMMINISTRATORE` | chiunque può creare un evento: essere organizzatore è una proprietà del singolo evento, non dell'account. Un ruolo globale non direbbe *di quale* evento si è organizzatori, e i permessi vanno verificati sull'evento |
 
@@ -41,7 +41,8 @@ Sei scelte divergono dal modello usato come base. Sono deliberate e motivate qui
 | `spring-boot-starter-webmvc` | controller REST, negoziazione JSON con Jackson 3 |
 | `spring-boot-starter-data-jpa` | entità, repository, transazioni. Hibernate 7 |
 | `spring-boot-starter-validation` | vincoli sui DTO e sui parametri di richiesta |
-| `spring-boot-starter-security` | catena dei filtri, sessione, CSRF, BCrypt, autorizzazioni |
+| `spring-boot-starter-security` | catena dei filtri, BCrypt, autorizzazioni |
+| `jjwt` (api/impl/jackson) | firma e verifica dei token JWT (HS256) |
 | `spring-boot-starter-websocket` | STOMP per chat e notifiche in tempo reale |
 | `spring-boot-starter-mail` | invio email su SMTP Gmail |
 | `spring-boot-starter-actuator` | `/actuator/health` per il controllo di salute su Render |
@@ -49,17 +50,18 @@ Sei scelte divergono dal modello usato come base. Sono deliberate e motivate qui
 | `spring-boot-devtools` | riavvio automatico in sviluppo |
 
 Hash delle password: `BCryptPasswordEncoder` con costo 12, incluso in Spring Security.
-Nessuna libreria JWT: la sessione è lato server.
+Autenticazione con token JWT (libreria jjwt): API stateless, nessuna sessione lato
+server e CSRF disattivato (il token viaggia nell'header, non in un cookie).
 
 ### Integrazione AI
 
 | Voce | Valore |
 |---|---|
-| Provider | Anthropic |
-| SDK | `com.anthropic:anthropic-java` 2.34.0 |
-| Modello | `claude-opus-5`, configurabile con `AI_MODELLO` |
-| Modalità | pensiero adattivo, input multimodale (immagine per URL + testo) |
-| Attivazione | `AI_ABILITATA=true` più `ANTHROPIC_API_KEY`. Spenta, l'endpoint risponde `403` con messaggio esplicito |
+| Provider | OpenRouter |
+| Client | chiamata REST con `RestClient` (nessun SDK dedicato) |
+| Modello | `nvidia/nemotron-nano-9b-v2:free`, configurabile con `AI_MODELLO` |
+| Modalità | input multimodale (immagine per URL + testo) in una sola chiamata |
+| Attivazione | `AI_ABILITATA=true` più `OPENROUTER_API_KEY`. Spenta, l'endpoint risponde `403` con messaggio esplicito |
 | Confine dei dati | partono solo il titolo, la descrizione da migliorare e l'immagine principale di quell'evento, e solo su richiesta esplicita dell'organizzatore |
 
 ## ENTITÀ
@@ -197,8 +199,8 @@ La riga è direzionale per sapere chi deve rispondere; la lettura considera entr
 
 ## CONTROLLERS ENDPOINTS
 
-Le richieste che modificano dati richiedono la sessione e l'header `X-XSRF-TOKEN`
-con il valore del cookie `XSRF-TOKEN`.
+Le richieste protette richiedono l'header `Authorization: Bearer <token>`, dove il
+token è il JWT restituito dal login. L'API è stateless e senza CSRF.
 
 ### 1. Login e registrazione — implementato
 
@@ -206,13 +208,14 @@ con il valore del cookie `XSRF-TOKEN`.
 
 | Metodo | Percorso | Scopo | Logica di servizio |
 |---|---|---|---|
-| GET | `/api/auth/csrf` | consegna il token CSRF e imposta il cookie | token reso esplicito, non pigro, così il frontend lo ha prima della prima scrittura |
 | POST | `/api/auth/registrazione` | crea l'account | email normalizzata e controllata come unica, password cifrata BCrypt, codice a sei cifre salvato con scadenza 15 minuti e spedito per email |
 | POST | `/api/auth/verifica` | conferma con il codice | cerca il codice non usato più recente, rifiuta se scaduto, lo segna usato e imposta `verificato = true` |
 | POST | `/api/auth/codice` | reinvia il codice | invalida i precedenti e ne genera uno nuovo |
-| POST | `/api/auth/login` | apre la sessione | `AuthenticationManager` con `DaoAuthenticationProvider`; sessione rigenerata e contesto salvato su `HttpSession`. Account non verificato o disattivato → `403` con messaggio leggibile, credenziali errate → `400` generico |
-| POST | `/api/auth/logout` | chiude la sessione | invalida la sessione, pulisce il contesto, cancella il cookie |
-| GET | `/api/auth/io` | dati della sessione corrente | |
+| POST | `/api/auth/login` | restituisce il token JWT | `AuthenticationManager` con `DaoAuthenticationProvider`; se le credenziali sono valide emette un JWT firmato HS256 (id, email, ruolo, scadenza). Account non verificato o disattivato → `403` con messaggio leggibile, credenziali errate → `400` generico |
+| GET | `/api/auth/io` | dati dell'utente del token | |
+
+Non c'è un endpoint di logout: essendo l'API stateless, il logout è lato client
+(si scarta il token) e il token perde validità alla scadenza.
 
 Validazioni: email conforme, password con almeno dieci caratteri, una lettera e una cifra,
 `dataNascita` nel passato. I campi password sono esclusi dalla sanificazione HTML, così
@@ -284,7 +287,7 @@ all'organizzatore a ogni nuova iscrizione, sulla destinazione `/utente/queue/sta
 
 | Metodo | Percorso | Scopo | Stato e logica |
 |---|---|---|---|
-| POST | `/api/eventi/{id}/descrizione/migliora` | riscrive la descrizione | **implementato**. Verifica la proprietà, prende l'immagine principale e la descrizione da migliorare, chiama Claude con istruzioni che vietano di inventare fatti, restituisce la proposta **senza salvarla**: decide l'organizzatore |
+| POST | `/api/eventi/{id}/descrizione/migliora` | riscrive la descrizione | **implementato**. Verifica la proprietà, prende l'immagine principale e la descrizione da migliorare, chiama il modello con istruzioni che vietano di inventare fatti, restituisce la proposta **senza salvarla**: decide l'organizzatore |
 | GET | `/api/ai/raccomandazioni` | eventi consigliati | **da implementare**. Nessuna chiamata al modello nel percorso di lettura: si parte dai dati già presenti — categorie e artisti degli eventi con ticket, amicizie, posizione — e si ordina per affinità in SQL. Il modello serve solo se serve una spiegazione in linguaggio naturale del perché di un suggerimento |
 | POST | `/api/eventi/{id}/analisi-capienza` | analisi della capienza | **da implementare**. Prima l'aggregazione: andamento delle iscrizioni, giorni residui, riempimento. Poi il modello riceve quei numeri, non le righe, e produce il commento e i suggerimenti |
 
@@ -299,16 +302,16 @@ Regole valide per tutto l'ambito AI:
 
 1. **Database e configurazione.** PostgreSQL locale, database `BUILD-WEEK-5` in pgAdmin, `application.yml` con le credenziali da variabili d'ambiente, `DATABASE_URL` di Render tradotta in formato JDBC all'avvio. Schema generato dalle entità con `ddl-auto: update`.
 2. **Fondamenta del backend.** Riorganizzazione per domini, dipendenze, eccezioni di dominio, gestione centralizzata degli errori con risposta uniforme, sanificazione delle stringhe in ingresso.
-3. **Sicurezza, CORS e WebSocket.** Catena dei filtri con sessione, CSRF su cookie, origini consentite da `ALLOWED_ORIGIN` per HTTP e per l'handshake WebSocket, intestazioni di sicurezza, endpoint STOMP `/ws` con code personali.
+3. **Sicurezza, CORS e WebSocket.** Catena dei filtri con autenticazione JWT stateless (CSRF disattivato), origini consentite da `ALLOWED_ORIGIN` per HTTP e per l'handshake WebSocket, intestazioni di sicurezza, endpoint STOMP `/ws` con code personali (token JWT nel frame CONNECT).
 4. **Scaffolding dei domini.** Entità, repository, servizi e controller nell'ordine delle dipendenze: utenti, eventi, mailing, ticket e notifiche, amicizie e chat, mappa. Ogni dominio su un branch, con commit progressivi e merge su `develop`.
-5. **Frontend.** Impalcatura con routing e client HTTP che propaga il token CSRF, poi le schermate nell'ordine in cui il backend si libera: autenticazione, eventi, ticket e notifiche live, mappa e chat, pagine di cookie e privacy policy.
-6. **Revisione finale.** Collaudo di tutti gli endpoint con gli stati HTTP attesi, controllo delle autorizzazioni lato server, allineamento dei documenti al codice, deploy su Render con `COOKIE_SECURE=true` e le variabili del mailing.
+5. **Frontend.** Impalcatura con routing e client HTTP che invia il token JWT nell'header `Authorization`, poi le schermate nell'ordine in cui il backend si libera: autenticazione, eventi, ticket e notifiche live, mappa e chat, pagine di cookie e privacy policy.
+6. **Revisione finale.** Collaudo di tutti gli endpoint con gli stati HTTP attesi, controllo delle autorizzazioni lato server, allineamento dei documenti al codice, deploy su Render con `JWT_SECRET`, le chiavi dei servizi (Google Geocoding, OpenRouter) e le variabili del mailing.
 
 ## STEP AI
 
 1. **Controllo delle dipendenze.** Verificare che le librerie dichiarate esistano nelle versioni indicate e che l'SDK usato sia quello ufficiale del provider, leggendo la documentazione della versione in uso invece di ricordarne le firme. Risolvere le dipendenze prima di scrivere codice.
 2. **Scrittura del codice.** Un dominio per volta, compilando a ogni passo. Le classi delle librerie esterne si verificano contro l'artefatto vero quando la documentazione non le copre: un errore del compilatore costa meno di un'ipotesi sbagliata.
-3. **Controlli di sicurezza.** A ogni endpoint nuovo: chi può chiamarlo, quali dati arrivano dal client e come sono validati, dove sta il controllo di autorizzazione. Le protezioni si verificano provandole — richiesta senza token CSRF, richiesta da utente non proprietario, invio verso un non amico — non dichiarandole.
+3. **Controlli di sicurezza.** A ogni endpoint nuovo: chi può chiamarlo, quali dati arrivano dal client e come sono validati, dove sta il controllo di autorizzazione. Le protezioni si verificano provandole — richiesta senza token, richiesta da utente non proprietario, invio verso un non amico — non dichiarandole.
 4. **Supporto al frontend.** Contratti degli endpoint documentati man mano, esempi di corpo e di risposta, formato degli errori uniforme, destinazioni WebSocket dichiarate. Il frontend non deve dedurre nulla dal codice del backend.
 5. **Debug e revisione finale.** Ogni errore si legge nel log e si corregge alla radice. Collaudo completo ripetuto alla fine, elenco esplicito di quello che resta aperto: nessun test automatico, nessun limite ai tentativi di login, sessioni in memoria, funzione AI mai eseguita contro il servizio reale.
 
