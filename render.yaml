@@ -42,6 +42,10 @@ services:
       # Chiave OpenRouter per la riscrittura AI delle descrizioni: segreta, va nel pannello.
       - key: OPENROUTER_API_KEY
         sync: false
+      # Chiave Google per il geocoding degli indirizzi (indirizzo -> coordinate alla
+      # creazione evento): segreta, va nel pannello. Vuota = geocoding spento a runtime.
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false
       # Account Gmail del progetto (vedi application.yml).
       - key: MAIL_USERNAME
         value: eventverse379@gmail.com
