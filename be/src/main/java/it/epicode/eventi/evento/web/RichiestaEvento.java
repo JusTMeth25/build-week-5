@@ -21,6 +21,7 @@ public record RichiestaEvento(
 		@DecimalMin("-90.0") @DecimalMax("90.0") Double latitudine,
 		@DecimalMin("-180.0") @DecimalMax("180.0") Double longitudine,
 		@Positive Integer capienza,
+		@Size(max = 30) String genere,
 		@Size(max = 30) List<@Size(max = 120) String> artisti,
 		@Size(max = 10) List<@Valid RichiestaImmagine> immagini,
 		@Size(max = 50) List<@Valid RichiestaMarker> marker) {

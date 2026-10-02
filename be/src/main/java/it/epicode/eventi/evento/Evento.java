@@ -56,6 +56,11 @@ public class Evento {
 
 	private Integer capienza;
 
+	// Nullable per non rompere l'update dello schema su eventi gia' esistenti:
+	// gli eventi creati/modificati dopo questa feature hanno sempre un valore (default ALTRO).
+	@Column(length = 30)
+	private String genere = "ALTRO";
+
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
 	@JoinColumn(name = "proprietario_id", nullable = false)
 	private Utente proprietario;
@@ -146,6 +151,14 @@ public class Evento {
 
 	public void setCapienza(Integer capienza) {
 		this.capienza = capienza;
+	}
+
+	public String getGenere() {
+		return genere;
+	}
+
+	public void setGenere(String genere) {
+		this.genere = genere;
 	}
 
 	public Utente getProprietario() {

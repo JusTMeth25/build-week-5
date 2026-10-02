@@ -122,6 +122,9 @@ public class ServizioEventi {
 		evento.setIndirizzo(richiesta.indirizzo());
 		applicaCoordinate(richiesta, evento);
 		evento.setCapienza(richiesta.capienza());
+		evento.setGenere(richiesta.genere() != null && !richiesta.genere().isBlank()
+				? richiesta.genere().strip()
+				: "ALTRO");
 
 		aggiornaArtisti(richiesta.artisti(), evento);
 		aggiornaImmagini(richiesta.immagini(), evento);

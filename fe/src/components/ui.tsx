@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import type { ButtonHTMLAttributes, HTMLAttributes, InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react'
+import type { ButtonHTMLAttributes, HTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react'
 import { cn } from '@/lib/utils'
 
 export function Button({ className, variant = 'primary', ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'ghost' | 'glass' | 'danger' }) {
@@ -16,6 +16,10 @@ export function Field(props: InputHTMLAttributes<HTMLInputElement>) {
 
 export function Area(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return <textarea {...props} className={cn('min-h-32 w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-400 focus:border-cyan-300/70', props.className)} />
+}
+
+export function Select({ children, className, ...props }: SelectHTMLAttributes<HTMLSelectElement> & { children: ReactNode }) {
+  return <select {...props} className={cn('w-full appearance-none rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-white outline-none focus:border-cyan-300/70 [&>option]:bg-slate-900 [&>option]:text-white', className)}>{children}</select>
 }
 
 export function Badge({ children, className }: { children: ReactNode; className?: string }) {

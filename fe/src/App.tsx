@@ -11,6 +11,7 @@ import {
   LogOut,
   MapPin,
   MessageCircle,
+  Pencil,
   Plus,
   QrCode,
   Search,
@@ -18,6 +19,7 @@ import {
   ShieldCheck,
   Sparkles,
   Ticket,
+  Trash2,
   User,
   Users,
   Wand2,
@@ -28,7 +30,7 @@ import { Link, NavLink, Route, Routes, useNavigate, useParams } from 'react-rout
 import { EventSphere } from '@/components/EventSphere'
 import { IndirizzoAutocomplete } from '@/components/IndirizzoAutocomplete'
 import MapDashboard from '@/components/mappa/MapDashboard'
-import { Area, Badge, Button, Card, Field, Reveal } from '@/components/ui'
+import { Area, Badge, Button, Card, Field, Reveal, Select } from '@/components/ui'
 import { useAuth } from '@/context/AuthContext'
 import { api, type Amicizia, type EventoInput, type EventoMappa, type EventoSintesi, type IndirizzoGeocodificato, type Messaggio, type Notifica, type Stato, type Ticket as TicketType } from '@/lib/api'
 import { cn, dataBella, giorno, iniziali } from '@/lib/utils'
@@ -221,7 +223,7 @@ function Accesso() {
 function Eventi() {
   const [query, setQuery] = useState('')
   const eventi = useAsync(() => api.eventi(query, 0), [query])
-  return <Shell><PageTitle icon={Compass} title="Esplora" subtitle="Scopri esperienze, concerti e community intorno a te." action={<Link to="/crea"><Button><Plus className="size-4" /> Nuovo evento</Button></Link>} /><div className="mb-6 flex gap-3"><Field placeholder="Cerca per titolo o luogo" value={query} onChange={e => setQuery(e.target.value)} /><Button variant="glass"><Search className="size-4" /></Button></div><StatusBox {...eventi} /> <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">{eventi.data?.content.map(e => <EventCard key={e.id} evento={e} />)}</div></Shell>
+  return <Shell><PageTitle icon={Compass} title="Esplora" subtitle="Scopri esperienze, concerti e community intorno a te." /><div className="mb-6 flex gap-3"><Field placeholder="Cerca per titolo o luogo" value={query} onChange={e => setQuery(e.target.value)} /><Button variant="glass"><Search className="size-4" /></Button></div><StatusBox {...eventi} /> <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">{eventi.data?.content.map(e => <EventCard key={e.id} evento={e} />)}</div></Shell>
 }
 
 function PageTitle({ icon: Icon, title, subtitle, action }: { icon: typeof Sparkles; title: string; subtitle: string; action?: React.ReactNode }) {
@@ -235,40 +237,98 @@ function StatusBox<T>({ loading, error }: { loading: boolean; error: string | nu
 }
 
 function DettaglioEvento() {
-  const { id } = useParams(); const eventId = Number(id)
+  const { id } = useParams(); const eventId = Number(id); const navigate = useNavigate()
   const { utente } = useAuth(); const evento = useAsync(() => api.evento(eventId), [eventId])
   const partecipanti = useAsync(() => utente ? api.partecipanti(eventId) : Promise.resolve([]), [eventId, utente?.id])
   const [msg, setMsg] = useState<string | null>(null)
   async function iscrivi() { if (!utente) { setMsg('Per prendere un ticket devi accedere o registrarti.'); return } try { await api.iscrivi(eventId); setMsg('Ticket generato! Lo trovi nella tua area ticket.') } catch (e) { setMsg(e instanceof Error ? e.message : String(e)) } }
   async function migliora() { if (!utente) { setMsg('Il copywriter AI e riservato agli utenti autenticati.'); return } if (!evento.data) return; try { const r = await api.miglioraDescrizione(eventId, evento.data.descrizione || ''); setMsg(r.descrizioneMigliorata) } catch (e) { setMsg(e instanceof Error ? e.message : String(e)) } }
+  async function elimina() { if (!confirm('Eliminare definitivamente questo evento?')) return; try { await api.eliminaEvento(eventId); navigate('/dashboard') } catch (e) { setMsg(e instanceof Error ? e.message : String(e)) } }
   const e = evento.data
-  return <Shell><StatusBox {...evento} />{e && <div className="grid gap-6 lg:grid-cols-[1.1fr_.9fr]"><Card className="overflow-hidden p-0"><img className="h-80 w-full object-cover" src={e.immaginePrincipale || e.immagini[0]?.url || fallbackImage} /><div className="p-6"><Badge><CalendarDays className="size-3" /> {dataBella(e.dataEvento)}</Badge><h1 className="mt-4 text-5xl font-black">{e.titolo}</h1><p className="mt-4 text-slate-300">{e.descrizione || 'Descrizione in arrivo.'}</p><div className="mt-6 flex flex-wrap gap-2">{e.artisti.map(a => <Badge key={a.id}>{a.nome}</Badge>)}</div></div></Card><div className="grid gap-4"><Card><h3 className="text-2xl font-black">Azioni rapide</h3><p className="mt-2 text-slate-400"><MapPin className="inline size-4" /> {e.indirizzo || e.luogo}</p><div className="mt-5 grid gap-3"><Button onClick={iscrivi}><Ticket className="size-4" /> {utente ? 'Prenota ticket' : 'Accedi per prenotare'}</Button><Button variant="glass" onClick={migliora}><Wand2 className="size-4" /> Migliora descrizione AI</Button></div>{!utente && <p className="mt-4 rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-3 text-sm text-cyan-50">Puoi guardare tutti i dettagli senza login. Registrati solo quando vuoi prendere il ticket.</p>}{msg && <p className="mt-4 rounded-2xl bg-white/10 p-3 text-sm text-cyan-50">{msg}</p>}</Card><Card><h3 className="mb-4 font-black">Partecipanti</h3>{utente ? <div className="grid gap-2">{partecipanti.data?.slice(0, 8).map(p => <div key={p.id} className="flex items-center justify-between rounded-2xl bg-white/5 p-3"><span>{p.nome} {p.cognome}</span><Button variant="ghost" onClick={() => api.richiediAmicizia(p.id)}>Connetti</Button></div>)}</div> : <p className="text-sm text-slate-400">Accedi per vedere i partecipanti e connetterti con la community.</p>}</Card></div></div>}</Shell>
+  const sonoProprietario = !!(utente && e?.proprietario && utente.id === e.proprietario.id)
+  return <Shell><StatusBox {...evento} />{e && <div className="grid gap-6 lg:grid-cols-[1.1fr_.9fr]"><Card className="overflow-hidden p-0"><img className="h-80 w-full object-cover" src={e.immaginePrincipale || e.immagini[0]?.url || fallbackImage} /><div className="p-6"><Badge><CalendarDays className="size-3" /> {dataBella(e.dataEvento)}</Badge><h1 className="mt-4 text-5xl font-black">{e.titolo}</h1><p className="mt-4 text-slate-300">{e.descrizione || 'Descrizione in arrivo.'}</p><div className="mt-6 flex flex-wrap gap-2">{e.artisti.map(a => <Badge key={a.id}>{a.nome}</Badge>)}</div></div></Card><div className="grid gap-4"><Card><h3 className="text-2xl font-black">Azioni rapide</h3><p className="mt-2 text-slate-400"><MapPin className="inline size-4" /> {e.indirizzo || e.luogo}</p><div className="mt-5 grid gap-3"><Button onClick={iscrivi}><Ticket className="size-4" /> {utente ? 'Prenota ticket' : 'Accedi per prenotare'}</Button>{sonoProprietario && <Button variant="glass" onClick={() => navigate(`/eventi/${eventId}/modifica`)}><Pencil className="size-4" /> Modifica evento</Button>}<Button variant="glass" onClick={migliora}><Wand2 className="size-4" /> Migliora descrizione AI</Button>{sonoProprietario && <Button variant="danger" onClick={elimina}><Trash2 className="size-4" /> Elimina evento</Button>}</div>{!utente && <p className="mt-4 rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-3 text-sm text-cyan-50">Puoi guardare tutti i dettagli senza login. Registrati solo quando vuoi prendere il ticket.</p>}{msg && <p className="mt-4 rounded-2xl bg-white/10 p-3 text-sm text-cyan-50">{msg}</p>}</Card><Card><h3 className="mb-4 font-black">Partecipanti</h3>{utente ? <div className="grid gap-2">{partecipanti.data?.slice(0, 8).map(p => <div key={p.id} className="flex items-center justify-between rounded-2xl bg-white/5 p-3"><span>{p.nome} {p.cognome}</span><Button variant="ghost" onClick={() => api.richiediAmicizia(p.id)}>Connetti</Button></div>)}</div> : <p className="text-sm text-slate-400">Accedi per vedere i partecipanti e connetterti con la community.</p>}</Card></div></div>}</Shell>
 }
 
+const GENERI = [
+  { value: 'ALTRO', label: 'Altro' },
+  { value: 'CONCERTO', label: 'Concerto' },
+  { value: 'FESTIVAL', label: 'Festival' },
+  { value: 'CONFERENZA', label: 'Conferenza' },
+  { value: 'SPORT', label: 'Sport' },
+  { value: 'TEATRO', label: 'Teatro' },
+  { value: 'MOSTRA', label: 'Mostra' },
+  { value: 'FESTA', label: 'Festa' },
+  { value: 'WORKSHOP', label: 'Workshop' },
+] as const
+
 function CreaEvento() {
-  const navigate = useNavigate(); const [errore, setErrore] = useState<string | null>(null)
-  const [form, setForm] = useState({ titolo: '', descrizione: '', dataEvento: '', luogo: '', indirizzo: '', latitudine: '', longitudine: '', immagine: '', artisti: '', capienza: '' })
-  // Coordinate scritte a mano -> indirizzo ricavato con il geocoding inverso (dopo una pausa di battitura).
-  const [coordinateManuali, setCoordinateManuali] = useState(false); const [geoInfo, setGeoInfo] = useState<string | null>(null)
+  const navigate = useNavigate(); const { id } = useParams()
+  const modifica = id != null; const eventId = Number(id)
+  const [errore, setErrore] = useState<string | null>(null)
+  const [caricato, setCaricato] = useState(!modifica)
+  const [form, setForm] = useState({ titolo: '', descrizione: '', dataEvento: '', luogo: '', indirizzo: '', latitudine: '', longitudine: '', immagine: '', artisti: '', capienza: '', genere: 'ALTRO' })
   useEffect(() => {
-    if (!coordinateManuali) return
-    const lat = Number(form.latitudine), lng = Number(form.longitudine)
-    if (form.latitudine === '' || form.longitudine === '' || !Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return
-    let annullato = false
-    const timer = setTimeout(async () => { setGeoInfo("Cerco l'indirizzo per queste coordinate..."); try { const r = await api.indirizzoDaCoordinate(lat, lng); if (!annullato) { setForm(f => ({ ...f, indirizzo: r.indirizzo })); setGeoInfo(null) } } catch { if (!annullato) setGeoInfo('Nessun indirizzo trovato per queste coordinate.') } }, 700)
-    return () => { annullato = true; clearTimeout(timer) }
-  }, [form.latitudine, form.longitudine, coordinateManuali])
-  const scegliLuogo = (r: IndirizzoGeocodificato) => { setCoordinateManuali(false); setGeoInfo(null); setForm(f => ({ ...f, indirizzo: r.indirizzo, latitudine: r.latitudine.toFixed(6), longitudine: r.longitudine.toFixed(6), luogo: f.luogo || r.nomeLuogo || '' })) }
-  // Un indirizzo riscritto a mano invalida le coordinate: le ricalcola il backend al salvataggio.
-  const scriviIndirizzo = (indirizzo: string) => { setCoordinateManuali(false); setForm(f => ({ ...f, indirizzo, latitudine: '', longitudine: '' })) }
-  const scriviCoordinata = (campo: 'latitudine' | 'longitudine', valore: string) => { setCoordinateManuali(true); setForm(f => ({ ...f, [campo]: valore })) }
-  async function submit(e: FormEvent) { e.preventDefault(); setErrore(null); const latitudine = form.latitudine ? Number(form.latitudine) : undefined; const longitudine = form.longitudine ? Number(form.longitudine) : undefined; const body: EventoInput = { titolo: form.titolo, descrizione: form.descrizione, dataEvento: new Date(form.dataEvento).toISOString(), luogo: form.luogo, indirizzo: form.indirizzo, latitudine, longitudine, capienza: form.capienza ? Number(form.capienza) : undefined, artisti: form.artisti.split(',').map(x => x.trim()).filter(Boolean), immagini: form.immagine ? [{ url: form.immagine, principale: true }] : [] }; try { const created = await api.creaEvento(body); navigate(`/eventi/${created.id}`) } catch (e) { setErrore(e instanceof Error ? e.message : String(e)) } }
-  return <Protected><Shell><PageTitle icon={Plus} title="Event studio" subtitle="Crea un evento con geocoding backend: coordinate opzionali, esperienza obbligatoria." /><Card><form onSubmit={submit} className="grid gap-4 lg:grid-cols-2"><Field placeholder="Titolo" value={form.titolo} onChange={e => setForm({ ...form, titolo: e.target.value })} required /><Field type="datetime-local" value={form.dataEvento} onChange={e => setForm({ ...form, dataEvento: e.target.value })} required /><Field placeholder="Luogo" value={form.luogo} onChange={e => setForm({ ...form, luogo: e.target.value })} required /><IndirizzoAutocomplete value={form.indirizzo} onChange={scriviIndirizzo} onSeleziona={scegliLuogo} /><Field placeholder="Latitudine es. 45.4408" type="number" step="any" min={-90} max={90} value={form.latitudine} onChange={e => scriviCoordinata('latitudine', e.target.value)} /><Field placeholder="Longitudine es. 9.2612" type="number" step="any" min={-180} max={180} value={form.longitudine} onChange={e => scriviCoordinata('longitudine', e.target.value)} />{geoInfo && <p className="lg:col-span-2 text-sm text-cyan-100">{geoInfo}</p>}<Field placeholder="Immagine https" value={form.immagine} onChange={e => setForm({ ...form, immagine: e.target.value })} /><Field placeholder="Capienza" type="number" value={form.capienza} onChange={e => setForm({ ...form, capienza: e.target.value })} /><Field className="lg:col-span-2" placeholder="Artisti separati da virgola" value={form.artisti} onChange={e => setForm({ ...form, artisti: e.target.value })} /><Area className="lg:col-span-2" placeholder="Descrizione" value={form.descrizione} onChange={e => setForm({ ...form, descrizione: e.target.value })} />{errore && <p className="lg:col-span-2 rounded-2xl bg-rose-500/15 p-3 text-rose-100">{errore}</p>}<p className="lg:col-span-2 text-sm text-slate-400">Scegli un indirizzo dai suggerimenti per compilare le coordinate, oppure inserisci latitudine e longitudine per ricavare l'indirizzo.</p><Button className="lg:col-span-2"><Sparkles className="size-4" /> Pubblica esperienza</Button></form></Card></Shell></Protected>
+    if (!modifica) return
+    let vivo = true
+    api.evento(eventId).then(e => {
+      if (!vivo) return
+      setForm({
+        titolo: e.titolo, descrizione: e.descrizione ?? '',
+        dataEvento: e.dataEvento ? new Date(e.dataEvento).toISOString().slice(0, 16) : '',
+        luogo: e.luogo ?? '', indirizzo: e.indirizzo ?? '',
+        latitudine: e.latitudine != null ? String(e.latitudine) : '',
+        longitudine: e.longitudine != null ? String(e.longitudine) : '',
+        immagine: e.immaginePrincipale ?? e.immagini?.[0]?.url ?? '',
+        artisti: (e.artisti ?? []).map(a => a.nome).join(', '),
+        capienza: e.capienza != null ? String(e.capienza) : '', genere: e.genere ?? 'ALTRO',
+      })
+      setCaricato(true)
+    }).catch(err => { if (vivo) { setErrore(err instanceof Error ? err.message : String(err)); setCaricato(true) } })
+    return () => { vivo = false }
+  }, [modifica, eventId])
+  // Scelta dai suggerimenti: riempie indirizzo, coordinate e nome del luogo.
+  const scegliLuogo = (r: IndirizzoGeocodificato) => setForm(f => ({ ...f, indirizzo: r.indirizzo, latitudine: r.latitudine.toFixed(6), longitudine: r.longitudine.toFixed(6), luogo: r.nomeLuogo || f.luogo }))
+  // Indirizzo riscritto a mano: le coordinate le ricalcola il backend al salvataggio.
+  const scriviIndirizzo = (indirizzo: string) => setForm(f => ({ ...f, indirizzo, latitudine: '', longitudine: '' }))
+  async function submit(e: FormEvent) {
+    e.preventDefault(); setErrore(null)
+    const latitudine = form.latitudine ? Number(form.latitudine) : undefined
+    const longitudine = form.longitudine ? Number(form.longitudine) : undefined
+    const luogo = form.luogo.trim() || form.indirizzo.trim() || form.titolo.trim()
+    const body: EventoInput = { titolo: form.titolo, descrizione: form.descrizione, dataEvento: new Date(form.dataEvento).toISOString(), luogo, indirizzo: form.indirizzo, latitudine, longitudine, capienza: form.capienza ? Number(form.capienza) : undefined, genere: form.genere, artisti: form.artisti.split(',').map(x => x.trim()).filter(Boolean), immagini: form.immagine ? [{ url: form.immagine, principale: true }] : undefined }
+    try {
+      const salvato = modifica ? await api.aggiornaEvento(eventId, body) : await api.creaEvento(body)
+      navigate(`/eventi/${salvato.id}`)
+    } catch (err) { setErrore(err instanceof Error ? err.message : String(err)) }
+  }
+  return <Protected><Shell>
+    <PageTitle icon={modifica ? Pencil : Plus} title={modifica ? 'Modifica evento' : 'Event studio'} subtitle={modifica ? 'Aggiorna i dettagli del tuo evento.' : "Crea un evento: scrivi l'indirizzo e il backend ricava le coordinate."} />
+    <Card>
+      {!caricato ? <p className="text-slate-300">Caricamento evento...</p> : (
+        <form onSubmit={submit} className="grid gap-4">
+          <div className="grid gap-4 md:grid-cols-3">
+            <Field placeholder="Titolo" value={form.titolo} onChange={e => setForm({ ...form, titolo: e.target.value })} required />
+            <Field placeholder="Artisti separati da virgola" value={form.artisti} onChange={e => setForm({ ...form, artisti: e.target.value })} />
+            <Field type="datetime-local" value={form.dataEvento} onChange={e => setForm({ ...form, dataEvento: e.target.value })} required />
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            <Select value={form.genere} onChange={e => setForm({ ...form, genere: e.target.value })}>{GENERI.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}</Select>
+            <IndirizzoAutocomplete value={form.indirizzo} onChange={scriviIndirizzo} onSeleziona={scegliLuogo} />
+            <Field placeholder="Capienza" type="number" min={1} value={form.capienza} onChange={e => setForm({ ...form, capienza: e.target.value })} />
+          </div>
+          <Area placeholder="Descrizione" value={form.descrizione} onChange={e => setForm({ ...form, descrizione: e.target.value })} />
+          <Field placeholder="Immagine https (opzionale)" value={form.immagine} onChange={e => setForm({ ...form, immagine: e.target.value })} />
+          {errore && <p className="rounded-2xl bg-rose-500/15 p-3 text-rose-100">{errore}</p>}
+          <Button><Sparkles className="size-4" /> {modifica ? 'Salva modifiche' : 'Pubblica esperienza'}</Button>
+        </form>
+      )}
+    </Card>
+  </Shell></Protected>
 }
 
 function Dashboard() {
   const miei = useAsync(() => api.mieiEventi(), [])
-  return <Protected><Shell><PageTitle icon={LayoutDashboard} title="Cockpit" subtitle="Il centro di controllo dei tuoi eventi." action={<Link to="/crea"><Button><Plus className="size-4" /> Crea</Button></Link>} /><div className="grid gap-4 md:grid-cols-3"><Metric label="Eventi gestiti" value={miei.data?.totalElements ?? 0} /><Metric label="Prossimo lancio" value={miei.data?.content[0] ? giorno(miei.data.content[0].dataEvento) : '--'} /><Metric label="Stack" value="Live" /></div><div className="mt-6 grid gap-4 md:grid-cols-2">{miei.data?.content.map(e => <EventCard key={e.id} evento={e} />)}</div></Shell></Protected>
+  return <Protected><Shell><PageTitle icon={LayoutDashboard} title="Cockpit" subtitle="Il centro di controllo dei tuoi eventi." action={<Link to="/crea"><Button><Plus className="size-4" /> Crea</Button></Link>} /><div className="grid gap-4 md:grid-cols-3"><Metric label="Eventi gestiti" value={miei.data?.totalElements ?? 0} /><Metric label="Prossimo lancio" value={miei.data?.content[0] ? giorno(miei.data.content[0].dataEvento) : '--'} /><Metric label="Stack" value="Live" /></div><div className="mt-6 grid gap-5 md:grid-cols-2 lg:grid-cols-3">{miei.data?.content.map(e => <EventCard key={e.id} evento={e} />)}</div></Shell></Protected>
 }
 function Metric({ label, value }: { label: string; value: string | number }) { return <Card><p className="text-sm text-slate-400">{label}</p><p className="mt-2 text-4xl font-black">{value}</p></Card> }
 
@@ -284,5 +344,5 @@ function Rete() { const amici = useAsync<Amicizia[]>(() => api.amici(), []); con
 function Profilo() { const { utente, refresh } = useAuth(); const [form, setForm] = useState(() => ({ nome: utente?.nome ?? '', cognome: utente?.cognome ?? '', indirizzo: utente?.indirizzo ?? '', telefono: utente?.telefono ?? '' })); async function salva(e: FormEvent) { e.preventDefault(); await api.aggiornaProfilo(form); await refresh() } return <Protected><Shell><PageTitle icon={User} title="Profilo" subtitle="La tua identità dentro EventVerse." /><Card><form onSubmit={salva} className="grid gap-4 md:grid-cols-2"><Field value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} /><Field value={form.cognome} onChange={e => setForm({ ...form, cognome: e.target.value })} /><Field value={form.indirizzo} onChange={e => setForm({ ...form, indirizzo: e.target.value })} /><Field value={form.telefono} onChange={e => setForm({ ...form, telefono: e.target.value })} /><Button className="md:col-span-2">Salva profilo</Button></form></Card></Shell></Protected> }
 
 export default function App() {
-  return <AnimatePresence mode="wait"><Routes><Route path="/" element={<Home />} /><Route path="/accesso" element={<Accesso />} /><Route path="/eventi" element={<Eventi />} /><Route path="/eventi/:id" element={<DettaglioEvento />} /><Route path="/crea" element={<CreaEvento />} /><Route path="/dashboard" element={<Dashboard />} /><Route path="/mappa" element={<Mappa />} /><Route path="/ticket" element={<TicketPage />} /><Route path="/notifiche" element={<NotifichePage />} /><Route path="/rete" element={<Rete />} /><Route path="/profilo" element={<Profilo />} /></Routes></AnimatePresence>
+  return <AnimatePresence mode="wait"><Routes><Route path="/" element={<Home />} /><Route path="/accesso" element={<Accesso />} /><Route path="/eventi" element={<Eventi />} /><Route path="/eventi/:id" element={<DettaglioEvento />} /><Route path="/eventi/:id/modifica" element={<CreaEvento />} /><Route path="/crea" element={<CreaEvento />} /><Route path="/dashboard" element={<Dashboard />} /><Route path="/mappa" element={<Mappa />} /><Route path="/ticket" element={<TicketPage />} /><Route path="/notifiche" element={<NotifichePage />} /><Route path="/rete" element={<Rete />} /><Route path="/profilo" element={<Profilo />} /></Routes></AnimatePresence>
 }
