@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{mail/layout :: pagina(${'Il tuo ticket per ' + ticket.nomeEvento()}, ~{::contenuto})}">
+<body>
+<div th:fragment="contenuto">
+  <p style="margin:0 0 12px; font-size:11px; font-weight:800; letter-spacing:0.2em; text-transform:uppercase; color:#67e8f9;">Ticket digitale</p>
+  <h1 style="margin:0 0 16px; font-size:30px; line-height:1.15; font-weight:900; color:#ffffff;" th:text="${ticket.nomeEvento()}">Nome evento</h1>
+  <p style="margin:0 0 24px;">Ciao <span th:text="${ticket.nomePartecipante()}">Nome</span>, il tuo posto &egrave; confermato. Presenta il codice all'ingresso.</p>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+         style="border-radius:24px; background-color:#111827; border:1px solid #1e293b;">
+    <tr>
+      <td style="padding:20px 24px; border-bottom:1px dashed #334155;">
+        <p style="margin:0; font-size:12px; color:#94a3b8;">Quando</p>
+        <p style="margin:2px 0 0; font-size:16px; font-weight:800; color:#ffffff;" th:text="${data}">20/12/2026 alle 21:00</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:20px 24px; border-bottom:1px dashed #334155;">
+        <p style="margin:0; font-size:12px; color:#94a3b8;">Dove</p>
+        <p style="margin:2px 0 0; font-size:16px; font-weight:800; color:#ffffff;" th:text="${ticket.luogo()}">Luogo</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:20px 24px; border-bottom:1px dashed #334155;">
+        <p style="margin:0; font-size:12px; color:#94a3b8;">Partecipante</p>
+        <p style="margin:2px 0 0; font-size:16px; font-weight:800; color:#ffffff;" th:text="${ticket.nomePartecipante()}">Nome</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:20px 24px;">
+        <p style="margin:0; font-size:12px; color:#94a3b8;">Codice ticket</p>
+        <p style="margin:6px 0 0;">
+          <span style="display:inline-block; border-radius:999px; background-color:#082f49; border:1px solid #155e75; padding:6px 14px; font-family:'SFMono-Regular',Consolas,Menlo,monospace; font-size:13px; font-weight:700; color:#cffafe;" th:text="${ticket.codice()}">codice</span>
+        </p>
+      </td>
+    </tr>
+  </table>
+
+  <p style="margin:28px 0 0;">
+    <a th:href="${urlApplicazione + '/ticket'}"
+       style="display:inline-block; border-radius:16px; background-color:#ffffff; padding:14px 24px; font-size:14px; font-weight:900; color:#020617; text-decoration:none;">Apri il wallet ticket</a>
+  </p>
+</div>
+</body>
+</html>

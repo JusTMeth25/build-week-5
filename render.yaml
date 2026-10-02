@@ -1,18 +1,13 @@
-# Blueprint Render: database + backend + frontend.
+# Blueprint Render: backend + frontend. Il database PostgreSQL e' esterno (Neon),
+# perche' l'account Render ha gia' usato il suo unico PostgreSQL gratuito.
 # Su Render: New > Blueprint > repository > Apply.
-# Rinominare app-db / app-be / app-fe con il nome del progetto.
-
-databases:
-  - name: app-db
-    databaseName: app
-    user: app
-    plan: free
-    region: frankfurt
+# Se un nome e' gia' preso Render aggiunge un suffisso all'indirizzo: in quel caso
+# aggiornare ALLOWED_ORIGIN e VITE_API_URL qui sotto.
 
 services:
   # ---------- Backend: Spring Boot via Docker ----------
   - type: web
-    name: app-be
+    name: eventverse-be
     runtime: docker
     plan: free
     region: frankfurt
@@ -26,16 +21,39 @@ services:
         - render.yaml
     envVars:
       - key: DATABASE_URL
-        fromDatabase:
-          name: app-db
-          property: connectionString
-      # Origine del FE per il CORS, es. https://app-fe.onrender.com
+        # Connection string di Neon (postgresql://...): segreta, va nel pannello.
+        sync: false
+      # Indirizzo del FE usato nei pulsanti delle email.
+      - key: APP_URL
+        value: https://eventverse-fe.onrender.com
+      # Origine del FE per il CORS.
       - key: ALLOWED_ORIGIN
+        value: https://eventverse-fe.onrender.com
+      # Chiave di firma dei token: Render la genera una volta e la mantiene tra i deploy.
+      - key: JWT_SECRET
+        generateValue: true
+      # AI attiva in produzione (in locale il default e' spenta).
+      - key: AI_ABILITATA
+        value: "true"
+      # Chiave OpenRouter per la riscrittura AI delle descrizioni: segreta, va nel pannello.
+      - key: OPENROUTER_API_KEY
+        sync: false
+      # Chiave Google per il geocoding degli indirizzi (indirizzo -> coordinate alla
+      # creazione evento): segreta, va nel pannello. Vuota = geocoding spento a runtime.
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false
+      # Account Gmail del progetto (vedi application.yml).
+      - key: MAIL_USERNAME
+        value: eventverse379@gmail.com
+      - key: MAIL_FROM
+        value: eventverse379@gmail.com
+      # Password per le app di Google: segreta, si inserisce nel pannello di Render.
+      - key: MAIL_PASSWORD
         sync: false
 
   # ---------- Frontend: build Vite statica ----------
   - type: web
-    name: app-fe
+    name: eventverse-fe
     runtime: static
     rootDir: fe
     buildCommand: npm ci && npm run build
@@ -45,9 +63,13 @@ services:
         - fe/**
         - render.yaml
     envVars:
-      # Indirizzo del BE, es. https://app-be.onrender.com (senza / finale)
+      # Indirizzo del BE, senza / finale. Letto in build: se cambia serve un nuovo deploy.
       - key: VITE_API_URL
-        sync: false
+        value: https://eventverse-be.onrender.com
+      # Token pubblico Mapbox (pk.) per la pagina /mappa: finisce comunque nel bundle del
+      # browser. Limitarlo agli URL del progetto su account.mapbox.com.
+      - key: VITE_MAPBOX_TOKEN
+        value: pk.eyJ1IjoiZ2lhbmx1Y2lsaTEiLCJhIjoiY211bzR1ZWYwMDFpbjJ6cXo2anNhNmx6aiJ9.93T2j7_z-_VBSQakkuwfoQ
     routes:
       - type: rewrite
         source: /*

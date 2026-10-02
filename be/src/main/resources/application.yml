@@ -32,7 +32,8 @@ spring:
   mail:
     host: ${MAIL_HOST:smtp.gmail.com}
     port: ${MAIL_PORT:587}
-    username: ${MAIL_USERNAME:}
+    # Account Gmail del progetto, uguale per tutti. La password resta fuori dal repo.
+    username: ${MAIL_USERNAME:eventverse379@gmail.com}
     password: ${MAIL_PASSWORD:}
     properties:
       mail:
@@ -63,10 +64,15 @@ app:
   cors:
     allowed-origins: ${ALLOWED_ORIGIN:http://localhost:5173,http://localhost:4173}
   mail:
-    mittente: ${MAIL_FROM:no-reply@piattaforma-eventi.it}
+    # Gmail spedisce solo a nome dell'account autenticato: mittente e username coincidono.
+    mittente: ${MAIL_FROM:eventverse379@gmail.com}
+    # Indirizzo del frontend, per i pulsanti nelle email (senza / finale).
+    url-applicazione: ${APP_URL:http://localhost:5173}
     abilitato: ${MAIL_ABILITATO:true}
   ai:
-    abilitata: ${AI_ABILITATA:true}
+    # Spenta di default: chi non ha la chiave OpenRouter avvia comunque il progetto.
+    # Si accende con AI_ABILITATA=true (su Render e' in render.yaml).
+    abilitata: ${AI_ABILITATA:false}
     modello: "${AI_MODELLO:nvidia/nemotron-3.5-lightning:free}"
     chiave: ${OPENROUTER_API_KEY:}
   geocoding:
@@ -78,7 +84,8 @@ app:
     tentativi-massimi: ${LOGIN_TENTATIVI_MASSIMI:5}
     blocco-minuti: ${LOGIN_BLOCCO_MINUTI:15}
     jwt:
-      segreto: ${JWT_SECRET:}
+      # Default SOLO per sviluppo locale: su Render JWT_SECRET viene generato (render.yaml).
+      segreto: ${JWT_SECRET:eventverse-chiave-di-sviluppo-locale-non-usare-in-produzione}
       scadenza-minuti: ${JWT_SCADENZA_MINUTI:120}
     # In produzione: ALLOWED_ORIGIN=https://<fe>.onrender.com (piu' valori separati da virgola).
     allowed-origins: ${ALLOWED_ORIGIN:http://localhost:5173,http://localhost:4173}
