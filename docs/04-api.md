@@ -141,19 +141,19 @@ Non ha endpoint propri: le tre email partono dalle operazioni che le generano.
 | Ticket | iscrizione a un evento | al partecipante |
 | Avviso di nuova iscrizione | iscrizione a un evento | al proprietario dell'evento |
 
-Provider SMTP Gmail. Configurazione tramite variabili d'ambiente:
+Provider Mailjet, tramite la sua API HTTP (Send API v3.1): il piano gratuito di Render
+blocca le porte SMTP. Configurazione tramite variabili d'ambiente:
 
 ```
 MAIL_ABILITATO=true
-MAIL_HOST=smtp.gmail.com
-MAIL_PORT=587
-MAIL_USERNAME=account@gmail.com
-MAIL_PASSWORD=password-per-le-app
+MAILJET_API_KEY=chiave-api
+MAILJET_SECRET_KEY=chiave-segreta
 MAIL_FROM=account@gmail.com
+MAIL_FROM_NAME=EventVerse
 ```
 
-`MAIL_PASSWORD` è una password per le app generata da Google, non quella
-dell'account: con la verifica in due passaggi attiva Gmail rifiuta la seconda.
+`MAIL_FROM` deve essere un indirizzo verificato su Mailjet (Account > Sender
+addresses), altrimenti Mailjet rifiuta l'invio.
 
 Con `MAIL_ABILITATO=false`, cioè per impostazione predefinita in locale, le tre email
 vengono scritte nel log del backend invece di essere spedite. È la modalità con cui si
