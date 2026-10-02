@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<!--
+  Cornice comune delle email, con la grafica di EventVerse: fondo scuro, card in vetro,
+  angoli molto arrotondati, accento ciano. Solo tabelle e stili in linea: molti client
+  di posta ignorano <style> e flexbox.
+  Uso: <html th:replace="~{mail/layout :: pagina(${anteprima}, ~{::contenuto})}">
+-->
+<html lang="it" xmlns:th="http://www.thymeleaf.org" th:fragment="pagina(anteprima, contenuto)">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="supported-color-schemes" content="dark">
+  <title>EventVerse</title>
+</head>
+<body style="margin:0; padding:0; background-color:#020617;">
+  <!-- Testo mostrato dai client nell'anteprima della casella, nascosto nel corpo. -->
+  <div style="display:none; max-height:0; overflow:hidden; opacity:0; color:#020617;" th:text="${anteprima}"></div>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+         style="background-color:#020617; background-image:linear-gradient(135deg,#020617 0%,#0f172a 45%,#111827 100%);">
+    <tr>
+      <td align="center" style="padding:40px 16px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;">
+
+          <tr>
+            <td style="padding:0 8px 24px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td width="44" height="44" align="center"
+                      style="width:44px; height:44px; border-radius:16px; background-color:#164e63; background-image:linear-gradient(120deg,#22d3ee,#a855f7,#f472b6); font-size:22px; line-height:44px; color:#ffffff;">&#9889;</td>
+                  <td style="padding-left:12px; font-family:Inter,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:20px; font-weight:900; letter-spacing:-0.02em; color:#f8fafc;">EventVerse</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="border-radius:32px; background-color:#0f172a; border:1px solid #1e293b; padding:36px 32px; font-family:Inter,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:15px; line-height:1.6; color:#cbd5e1;">
+              <th:block th:replace="${contenuto}"></th:block>
+            </td>
+          </tr>
+
+          <tr>
+            <td align="center" style="padding:24px 16px 0; font-family:Inter,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:12px; line-height:1.6; color:#64748b;">
+              Ricevi questa email perch&eacute; hai un account su EventVerse.<br>
+              <a th:href="${urlApplicazione}" style="color:#67e8f9; text-decoration:none;" th:text="${urlApplicazione}">EventVerse</a>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

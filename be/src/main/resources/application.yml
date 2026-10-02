@@ -29,22 +29,6 @@ spring:
       max-file-size: 5MB
       max-request-size: 25MB
 
-  mail:
-    host: ${MAIL_HOST:smtp.gmail.com}
-    port: ${MAIL_PORT:587}
-    # Account Gmail del progetto, uguale per tutti. La password resta fuori dal repo.
-    username: ${MAIL_USERNAME:eventverse379@gmail.com}
-    password: ${MAIL_PASSWORD:}
-    properties:
-      mail:
-        smtp:
-          auth: true
-          starttls:
-            enable: true
-            required: true
-        transport:
-          protocol: smtp
-
 server:
   # Render assegna la porta in PORT.
   port: ${PORT:8080}
@@ -64,8 +48,15 @@ app:
   cors:
     allowed-origins: ${ALLOWED_ORIGIN:http://localhost:5173,http://localhost:4173}
   mail:
-    # Gmail spedisce solo a nome dell'account autenticato: mittente e username coincidono.
+    # Invio via API HTTP di Mailjet: il mittente deve essere un indirizzo verificato
+    # su Mailjet (Account > Sender addresses).
     mittente: ${MAIL_FROM:eventverse379@gmail.com}
+    nome-mittente: ${MAIL_FROM_NAME:EventVerse}
+    mailjet:
+      api-key: ${MAILJET_API_KEY:}
+      secret-key: ${MAILJET_SECRET_KEY:}
+    # Indirizzo del frontend, per i pulsanti nelle email (senza / finale).
+    url-applicazione: ${APP_URL:http://localhost:5173}
     abilitato: ${MAIL_ABILITATO:true}
   ai:
     # Spenta di default: chi non ha la chiave OpenRouter avvia comunque il progetto.

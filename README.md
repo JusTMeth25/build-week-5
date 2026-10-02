@@ -54,9 +54,9 @@ i due punti in `application.yml` sono i default locali).
 | `GOOGLE_MAPS_API_KEY` | vuota | geocoding: ricava le coordinate dall'indirizzo dell'evento |
 | `GEOCODING_ABILITATO` | `true` | con `false` disattiva il geocoding |
 | `MAIL_ABILITATO` | `true` | con `false` le email finiscono nel log invece di partire |
-| `MAIL_HOST` / `MAIL_PORT` | `smtp.gmail.com` / `587` | server SMTP |
-| `MAIL_USERNAME` / `MAIL_PASSWORD` | vuoti | account Gmail e password per le app |
-| `MAIL_FROM` | `no-reply@piattaforma-eventi.it` | mittente delle email |
+| `MAILJET_API_KEY` / `MAILJET_SECRET_KEY` | vuote | chiavi API di Mailjet per l'invio delle email |
+| `MAIL_FROM` | `eventverse379@gmail.com` | mittente delle email (indirizzo verificato su Mailjet) |
+| `MAIL_FROM_NAME` | `EventVerse` | nome visualizzato del mittente |
 | `AI_ABILITATA` | `true` | attiva il miglioramento della descrizione |
 | `AI_MODELLO` | `nvidia/nemotron-3.5-lightning:free` | modello usato per la riscrittura (via OpenRouter) |
 | `OPENROUTER_API_KEY` | vuota | chiave del servizio AI (OpenRouter) |
