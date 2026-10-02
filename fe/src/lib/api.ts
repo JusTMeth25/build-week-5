@@ -15,6 +15,8 @@ export type Notifica = { id: number; tipo: string; messaggio: string; eventoId?:
 export type Partecipante = { id: number; nome: string; cognome: string; statoAmicizia?: string; richiestaInviataDaMe: boolean }
 export type Amicizia = { id: number; richiedente: UtentePubblico; destinatario: UtentePubblico; stato: string; creataIl: string }
 export type Messaggio = { id: number; mittenteId: number; nomeMittente: string; destinatarioId: number; contenuto: string; inviatoIl: string; lettoIl?: string }
+export type SuggerimentoIndirizzo = { idLuogo: string; descrizione: string; principale?: string; secondario?: string }
+export type IndirizzoGeocodificato = { indirizzo: string; nomeLuogo?: string; latitudine: number; longitudine: number }
 export type ApiError = Error & { status?: number }
 
 export const sessione = {
@@ -67,6 +69,9 @@ export const api = {
     const qs = latitudine != null && longitudine != null ? `?latitudine=${latitudine}&longitudine=${longitudine}` : ''
     return chiama<EventoMappa[]>(`/api/mappa/eventi${qs}`)
   },
+  suggerimentiIndirizzo: (testo: string, sessione: string) => chiama<SuggerimentoIndirizzo[]>(`/api/geocoding/suggerimenti?testo=${encodeURIComponent(testo)}&sessione=${encodeURIComponent(sessione)}`),
+  dettaglioLuogo: (idLuogo: string, sessione: string) => chiama<IndirizzoGeocodificato>(`/api/geocoding/luoghi/${encodeURIComponent(idLuogo)}?sessione=${encodeURIComponent(sessione)}`),
+  indirizzoDaCoordinate: (latitudine: number, longitudine: number) => chiama<IndirizzoGeocodificato>(`/api/geocoding/inverso?latitudine=${latitudine}&longitudine=${longitudine}`),
   iscrivi: (eventoId: number) => chiama<Ticket>(`/api/eventi/${eventoId}/iscrizione`, { method: 'POST' }),
   ticket: () => chiama<Ticket[]>('/api/ticket'),
   annullaTicket: (id: number) => chiama<void>(`/api/ticket/${id}`, { method: 'DELETE' }),
