@@ -1,16 +1,17 @@
 @echo off
 setlocal
-title Piattaforma eventi (locale)
+title EventVerse (locale)
 cd /d "%~dp0"
 
 rem ---------- PostgreSQL: serve il database BUILD-WEEK-5 sulla 5432 ----------
 rem DB_URL del progetto: una variabile rimasta da un altro progetto avrebbe la
 rem precedenza su application.yml e il backend si collegherebbe al db sbagliato.
 set "DB_URL=jdbc:postgresql://localhost:5432/BUILD-WEEK-5"
-powershell -NoProfile -Command "$c=New-Object Net.Sockets.TcpClient; try { $c.Connect('localhost',5432); exit 0 } catch { exit 1 }" >nul 2>&1
+
+powershell -NoProfile -Command "$c=New-Object Net.Sockets.TcpClient; try { $c.Connect('localhost',5432); $c.Close(); exit 0 } catch { exit 1 }" >nul 2>&1
 if errorlevel 1 (
   echo [postgres] porta 5432 chiusa: il backend non partira'.
-  echo            createdb -U postgres BUILD-WEEK-5
+  echo            Crea il database se manca: createdb -U postgres BUILD-WEEK-5
 ) else (
   echo [postgres] in ascolto sulla 5432.
 )
@@ -22,11 +23,13 @@ if not exist "fe\node_modules" (
   popd
 )
 
-start "BE (8080)" /D "%~dp0be" cmd /k .\mvnw.cmd spring-boot:run
-start "FE (5173)" /D "%~dp0fe" cmd /k npm run dev
+start "BE (8080)" /D "%~dp0be" cmd /k ".\mvnw.cmd spring-boot:run"
+start "FE (5173)" /D "%~dp0fe" cmd /k "npm run dev"
 
 echo.
 echo  Applicazione : http://localhost:5173
 echo  Stato        : http://localhost:8080/api/stato
 echo  Salute       : http://localhost:8080/actuator/health
+echo.
+echo  Nota: se hai appena modificato variabili d'ambiente, chiudi e riapri i terminali.
 endlocal

@@ -58,8 +58,21 @@ i due punti in `application.yml` sono i default locali).
 | `MAIL_USERNAME` / `MAIL_PASSWORD` | vuoti | account Gmail e password per le app |
 | `MAIL_FROM` | `no-reply@piattaforma-eventi.it` | mittente delle email |
 | `AI_ABILITATA` | `true` | attiva il miglioramento della descrizione |
-| `AI_MODELLO` | `nvidia/nemotron-nano-9b-v2:free` | modello usato per la riscrittura (via OpenRouter) |
+| `AI_MODELLO` | `nvidia/nemotron-3.5-lightning:free` | modello usato per la riscrittura (via OpenRouter) |
 | `OPENROUTER_API_KEY` | vuota | chiave del servizio AI (OpenRouter) |
+
+Frontend (`fe/.env` o variabili del servizio statico su Render):
+
+| Variabile | Valore predefinito | A cosa serve |
+|---|---|---|
+| `VITE_API_URL` | vuota | URL del backend; in locale può restare vuota perché usa il proxy di Vite |
+| `VITE_GOOGLE_MAPS_API_KEY` | vuota | Google Maps JavaScript API per visualizzare la mappa pubblica `/mappa`; in locale può essere omessa se esiste già `GOOGLE_MAPS_API_KEY` nel sistema |
+
+Nota: in sviluppo `fe/vite.config.ts` copia automaticamente `GOOGLE_MAPS_API_KEY`
+dell'ambiente in `VITE_GOOGLE_MAPS_API_KEY`, così la stessa chiave può servire sia al
+backend per il geocoding sia al frontend per Google Maps JavaScript API. Su Render è
+comunque consigliato impostare esplicitamente anche `VITE_GOOGLE_MAPS_API_KEY` sul
+servizio statico frontend.
 
 L'autenticazione è con token JWT: nessuna sessione lato server e nessun cookie di
 sessione. Se nel terminale è presente una `DB_URL` di un altro progetto, avviare il
@@ -117,6 +130,7 @@ Il dettaglio delle regole è in [docs/03-piano-di-sviluppo.md](docs/03-piano-di-
    | `app-be` | `GOOGLE_MAPS_API_KEY` | chiave Google (se serve il geocoding) |
    | `app-be` | `OPENROUTER_API_KEY` | chiave OpenRouter (se serve l'AI) |
    | `app-fe` | `VITE_API_URL` | `https://app-be.onrender.com` |
+   | `app-fe` | `VITE_GOOGLE_MAPS_API_KEY` | chiave browser Google Maps JavaScript API |
 
 4. Impostare anche le variabili del mailing se le email devono partire davvero.
 5. **Manual Deploy** di entrambi: `VITE_API_URL` è letta in fase di build.
