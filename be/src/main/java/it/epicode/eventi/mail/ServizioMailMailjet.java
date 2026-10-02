@@ -66,6 +66,15 @@ public class ServizioMailMailjet implements ServizioMail {
 
 	@Override
 	@Async
+	public void inviaResetPassword(String destinatario, String nome, String token) {
+		Context contesto = contesto();
+		contesto.setVariable("nome", nome);
+		contesto.setVariable("linkReset", urlApplicazione + "/reimposta-password?token=" + token);
+		spedisci(destinatario, "Reimposta la tua password", "mail/reset-password", contesto);
+	}
+
+	@Override
+	@Async
 	public void inviaTicket(String destinatario, DatiTicket ticket) {
 		Context contesto = contesto();
 		contesto.setVariable("ticket", ticket);

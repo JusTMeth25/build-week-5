@@ -17,6 +17,11 @@ public class ServizioMailRegistrato implements ServizioMail {
 	}
 
 	@Override
+	public void inviaResetPassword(String destinatario, String nome, String token) {
+		log.info("[mail non abilitata] token reset password per {}: {}", destinatario, token);
+	}
+
+	@Override
 	public void inviaTicket(String destinatario, DatiTicket ticket) {
 		log.info("[mail non abilitata] ticket {} per {} all'evento {}",
 				ticket.codice(), destinatario, ticket.nomeEvento());

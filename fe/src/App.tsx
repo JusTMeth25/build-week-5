@@ -26,7 +26,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { Link, NavLink, Route, Routes, useNavigate, useParams } from 'react-router-dom'
+import { Link, NavLink, Route, Routes, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { EventSphere } from '@/components/EventSphere'
 import { IndirizzoAutocomplete } from '@/components/IndirizzoAutocomplete'
 import MapDashboard from '@/components/mappa/MapDashboard'
@@ -187,7 +187,7 @@ function EventCard({ evento, featured = false }: { evento: EventoSintesi | Event
 function Accesso() {
   const { login } = useAuth()
   const navigate = useNavigate()
-  const [mode, setMode] = useState<'login' | 'register' | 'verify'>('login')
+  const [mode, setMode] = useState<'login' | 'register' | 'verify' | 'forgot'>('login')
   const [form, setForm] = useState({ email: '', password: '', nome: '', cognome: '', codice: '' })
   const [errore, setErrore] = useState<string | null>(null)
   const [ok, setOk] = useState<string | null>(null)
@@ -197,6 +197,7 @@ function Accesso() {
       if (mode === 'login') { await login(form.email, form.password); navigate('/dashboard') }
       if (mode === 'register') { await api.registrazione(form); setMode('verify'); setOk('Account creato: inserisci il codice ricevuto/loggato dal backend.') }
       if (mode === 'verify') { await api.verifica(form.email, form.codice); setMode('login'); setOk('Account verificato. Ora puoi accedere.') }
+      if (mode === 'forgot') { await api.passwordDimenticata(form.email); setOk('Se l\'email è registrata, ti abbiamo inviato un link per reimpostare la password. Controlla la casella.') }
     } catch (e) { setErrore(e instanceof Error ? e.message : String(e)) }
   }
   return (
@@ -207,12 +208,15 @@ function Accesso() {
           <div className="mb-6 flex gap-2">{(['login', 'register', 'verify'] as const).map(x => <Button key={x} variant={mode === x ? 'primary' : 'ghost'} onClick={() => setMode(x)}>{x === 'login' ? 'Login' : x === 'register' ? 'Registrati' : 'Verifica'}</Button>)}</div>
           <form onSubmit={submit} className="grid gap-3">
             <Field placeholder="email" type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} required />
-            {mode !== 'verify' && <Field placeholder="password" type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} required />}
+            {(mode === 'login' || mode === 'register') && <Field placeholder="password" type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} required />}
             {mode === 'register' && <><Field placeholder="nome" value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} required /><Field placeholder="cognome" value={form.cognome} onChange={e => setForm({ ...form, cognome: e.target.value })} required /></>}
             {mode === 'verify' && <Field placeholder="codice a 6 cifre" value={form.codice} onChange={e => setForm({ ...form, codice: e.target.value })} required />}
+            {mode === 'forgot' && <p className="text-sm text-slate-400">Inserisci la tua email: ti invieremo un link per reimpostare la password.</p>}
             {errore && <p className="rounded-2xl bg-rose-500/15 p-3 text-sm text-rose-100">{errore}</p>}
             {ok && <p className="rounded-2xl bg-emerald-500/15 p-3 text-sm text-emerald-100">{ok}</p>}
-            <Button>{mode === 'login' ? 'Accedi' : mode === 'register' ? 'Crea account' : 'Verifica account'}</Button>
+            <Button>{mode === 'login' ? 'Accedi' : mode === 'register' ? 'Crea account' : mode === 'verify' ? 'Verifica account' : 'Invia link di reset'}</Button>
+            {mode === 'login' && <button type="button" className="text-sm text-cyan-200 hover:underline" onClick={() => { setErrore(null); setOk(null); setMode('forgot') }}>Password dimenticata?</button>}
+            {mode === 'forgot' && <button type="button" className="text-sm text-cyan-200 hover:underline" onClick={() => { setErrore(null); setOk(null); setMode('login') }}>← Torna al login</button>}
           </form>
         </Card>
       </div>
@@ -343,6 +347,25 @@ function Rete() { const amici = useAsync<Amicizia[]>(() => api.amici(), []); con
 
 function Profilo() { const { utente, refresh } = useAuth(); const [form, setForm] = useState(() => ({ nome: utente?.nome ?? '', cognome: utente?.cognome ?? '', indirizzo: utente?.indirizzo ?? '', telefono: utente?.telefono ?? '' })); async function salva(e: FormEvent) { e.preventDefault(); await api.aggiornaProfilo(form); await refresh() } return <Protected><Shell><PageTitle icon={User} title="Profilo" subtitle="La tua identità dentro EventVerse." /><Card><form onSubmit={salva} className="grid gap-4 md:grid-cols-2"><Field value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} /><Field value={form.cognome} onChange={e => setForm({ ...form, cognome: e.target.value })} /><Field value={form.indirizzo} onChange={e => setForm({ ...form, indirizzo: e.target.value })} /><Field value={form.telefono} onChange={e => setForm({ ...form, telefono: e.target.value })} /><Button className="md:col-span-2">Salva profilo</Button></form></Card></Shell></Protected> }
 
+function ReimpostaPassword() {
+  const [params] = useSearchParams(); const token = params.get('token') ?? ''
+  const [password, setPassword] = useState(''); const [errore, setErrore] = useState<string | null>(null); const [ok, setOk] = useState(false)
+  async function submit(e: FormEvent) {
+    e.preventDefault(); setErrore(null)
+    try { await api.reimpostaPassword(token, password); setOk(true) } catch (err) { setErrore(err instanceof Error ? err.message : String(err)) }
+  }
+  return <Shell><div className="mx-auto max-w-md"><Card className="p-6">
+    <h1 className="text-3xl font-black">Reimposta password</h1>
+    {!token ? <p className="mt-4 rounded-2xl bg-rose-500/15 p-3 text-sm text-rose-100">Link non valido: manca il token. Richiedi di nuovo il reset dalla pagina di accesso.</p>
+      : ok ? <><p className="mt-4 rounded-2xl bg-emerald-500/15 p-3 text-sm text-emerald-100">Password aggiornata. Ora puoi accedere con la nuova password.</p><Link to="/accesso"><Button className="mt-5">Vai al login</Button></Link></>
+      : <form onSubmit={submit} className="mt-5 grid gap-3">
+          <Field placeholder="Nuova password (min 10, 1 lettera, 1 cifra)" type="password" value={password} onChange={e => setPassword(e.target.value)} required />
+          {errore && <p className="rounded-2xl bg-rose-500/15 p-3 text-sm text-rose-100">{errore}</p>}
+          <Button>Aggiorna password</Button>
+        </form>}
+  </Card></div></Shell>
+}
+
 export default function App() {
-  return <AnimatePresence mode="wait"><Routes><Route path="/" element={<Home />} /><Route path="/accesso" element={<Accesso />} /><Route path="/eventi" element={<Eventi />} /><Route path="/eventi/:id" element={<DettaglioEvento />} /><Route path="/eventi/:id/modifica" element={<CreaEvento />} /><Route path="/crea" element={<CreaEvento />} /><Route path="/dashboard" element={<Dashboard />} /><Route path="/mappa" element={<Mappa />} /><Route path="/ticket" element={<TicketPage />} /><Route path="/notifiche" element={<NotifichePage />} /><Route path="/rete" element={<Rete />} /><Route path="/profilo" element={<Profilo />} /></Routes></AnimatePresence>
+  return <AnimatePresence mode="wait"><Routes><Route path="/" element={<Home />} /><Route path="/accesso" element={<Accesso />} /><Route path="/reimposta-password" element={<ReimpostaPassword />} /><Route path="/eventi" element={<Eventi />} /><Route path="/eventi/:id" element={<DettaglioEvento />} /><Route path="/eventi/:id/modifica" element={<CreaEvento />} /><Route path="/crea" element={<CreaEvento />} /><Route path="/dashboard" element={<Dashboard />} /><Route path="/mappa" element={<Mappa />} /><Route path="/ticket" element={<TicketPage />} /><Route path="/notifiche" element={<NotifichePage />} /><Route path="/rete" element={<Rete />} /><Route path="/profilo" element={<Profilo />} /></Routes></AnimatePresence>
 }

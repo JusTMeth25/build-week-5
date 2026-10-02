@@ -46,6 +46,18 @@ public class ControllerAutenticazione {
 		servizioUtenti.reinviaCodice(richiesta.email());
 	}
 
+	@PostMapping("/password-dimenticata")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	public void passwordDimenticata(@Valid @RequestBody RichiestaPasswordDimenticata richiesta) {
+		servizioUtenti.richiediResetPassword(richiesta.email());
+	}
+
+	@PostMapping("/reimposta-password")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	public void reimpostaPassword(@Valid @RequestBody RichiestaReimpostaPassword richiesta) {
+		servizioUtenti.reimpostaPassword(richiesta.token(), richiesta.password());
+	}
+
 	@PostMapping("/login")
 	public RispostaAccesso login(@Valid @RequestBody RichiestaLogin richiesta) {
 		var accesso = servizioAutenticazione.accedi(richiesta.email(), richiesta.password());

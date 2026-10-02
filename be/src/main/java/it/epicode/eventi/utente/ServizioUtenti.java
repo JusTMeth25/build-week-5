@@ -14,25 +14,30 @@ import org.springframework.transaction.annotation.Transactional;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.UUID;
 
 @Service
 public class ServizioUtenti {
 
 	private static final SecureRandom CASUALE = new SecureRandom();
+	private static final Duration DURATA_RESET = Duration.ofMinutes(30);
 
 	private final UtenteRepository utenti;
 	private final CodiceVerificaRepository codici;
+	private final TokenResetRepository tokenReset;
 	private final PasswordEncoder cifratore;
 	private final ServizioMail mail;
 	private final Duration durataCodice;
 
 	public ServizioUtenti(UtenteRepository utenti,
 			CodiceVerificaRepository codici,
+			TokenResetRepository tokenReset,
 			PasswordEncoder cifratore,
 			ServizioMail mail,
 			@Value("${app.verifica.durata-codice-minuti}") long durataCodiceMinuti) {
 		this.utenti = utenti;
 		this.codici = codici;
+		this.tokenReset = tokenReset;
 		this.cifratore = cifratore;
 		this.mail = mail;
 		this.durataCodice = Duration.ofMinutes(durataCodiceMinuti);
@@ -86,6 +91,32 @@ public class ServizioUtenti {
 
 		trovato.segnaUsato();
 		utente.setVerificato(true);
+	}
+
+	// Non rivela se l'email esiste: risponde sempre uguale per non far enumerare gli account.
+	@Transactional
+	public void richiediResetPassword(String emailRichiesta) {
+		utenti.findByEmailIgnoreCase(normalizzaEmail(emailRichiesta)).ifPresent(utente -> {
+			tokenReset.invalidaPrecedenti(utente);
+			String token = UUID.randomUUID().toString();
+			tokenReset.save(new TokenReset(utente, token, Instant.now().plus(DURATA_RESET)));
+			mail.inviaResetPassword(utente.getEmail(), utente.getNome(), token);
+		});
+	}
+
+	@Transactional
+	public void reimpostaPassword(String token, String nuovaPassword) {
+		TokenReset trovato = tokenReset.findFirstByTokenAndUsatoFalse(token)
+				.orElseThrow(() -> new RichiestaNonValida("Link non valido o gia' usato"));
+		if (trovato.isScaduto()) {
+			throw new RichiestaNonValida("Link scaduto, richiedi un nuovo reset");
+		}
+		Utente utente = trovato.getUtente();
+		utente.setPasswordHash(cifratore.encode(nuovaPassword));
+		utente.setTentativiFalliti(0);
+		utente.setBloccatoFinoIl(null);
+		trovato.segnaUsato();
+		tokenReset.invalidaPrecedenti(utente);
 	}
 
 	@Transactional

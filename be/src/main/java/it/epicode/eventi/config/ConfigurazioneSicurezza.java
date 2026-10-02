@@ -35,6 +35,8 @@ public class ConfigurazioneSicurezza {
 			"/api/auth/registrazione",
 			"/api/auth/verifica",
 			"/api/auth/codice",
+			"/api/auth/password-dimenticata",
+			"/api/auth/reimposta-password",
 			"/api/auth/login",
 			"/actuator/health",
 			"/actuator/health/**"

@@ -6,6 +6,8 @@ import it.epicode.eventi.comune.eccezioni.RichiestaNonValida;
 import it.epicode.eventi.comune.eccezioni.RisorsaNonTrovata;
 import it.epicode.eventi.geocoding.Coordinate;
 import it.epicode.eventi.geocoding.ServizioGeocodifica;
+import it.epicode.eventi.ticket.Ticket;
+import it.epicode.eventi.ticket.TicketRepository;
 import it.epicode.eventi.evento.web.RichiestaEvento;
 import it.epicode.eventi.evento.web.RispostaDescrizione;
 import it.epicode.eventi.evento.web.RispostaEvento;
@@ -30,17 +32,20 @@ public class ServizioEventi {
 	private final ArtistaRepository artisti;
 	private final MiglioratoreDescrizione miglioratore;
 	private final ServizioGeocodifica geocodifica;
+	private final TicketRepository ticket;
 	private final ApplicationEventPublisher pubblicatore;
 
 	public ServizioEventi(EventoRepository eventi,
 			ArtistaRepository artisti,
 			MiglioratoreDescrizione miglioratore,
 			ServizioGeocodifica geocodifica,
+			TicketRepository ticket,
 			ApplicationEventPublisher pubblicatore) {
 		this.eventi = eventi;
 		this.artisti = artisti;
 		this.miglioratore = miglioratore;
 		this.geocodifica = geocodifica;
+		this.ticket = ticket;
 		this.pubblicatore = pubblicatore;
 	}
 
@@ -49,7 +54,10 @@ public class ServizioEventi {
 		Evento evento = new Evento();
 		evento.setProprietario(proprietario);
 		applica(richiesta, evento);
-		return RispostaEvento.da(eventi.save(evento));
+		Evento salvato = eventi.save(evento);
+		// Il creatore figura anche come partecipante, così può connettersi con gli altri.
+		ticket.save(new Ticket(salvato, proprietario));
+		return RispostaEvento.da(salvato);
 	}
 
 	@Transactional
