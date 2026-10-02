@@ -11,6 +11,8 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.thymeleaf.ITemplateEngine;
+import org.thymeleaf.context.Context;
 
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -23,74 +25,66 @@ public class ServizioMailSmtp implements ServizioMail {
 	private static final Logger log = LoggerFactory.getLogger(ServizioMailSmtp.class);
 
 	private static final DateTimeFormatter FORMATO_DATA = DateTimeFormatter
-			.ofPattern("dd/MM/yyyy 'alle' HH:mm", Locale.ITALIAN)
+			.ofPattern("EEEE d MMMM yyyy 'alle' HH:mm", Locale.ITALIAN)
 			.withZone(ZoneId.of("Europe/Rome"));
 
 	private final JavaMailSender postino;
+	private final ITemplateEngine motore;
 	private final String mittente;
+	private final String urlApplicazione;
 
-	public ServizioMailSmtp(JavaMailSender postino, @Value("${app.mail.mittente}") String mittente) {
+	public ServizioMailSmtp(JavaMailSender postino, ITemplateEngine motore,
+			@Value("${app.mail.mittente}") String mittente,
+			@Value("${app.mail.url-applicazione}") String urlApplicazione) {
 		this.postino = postino;
+		this.motore = motore;
 		this.mittente = mittente;
+		this.urlApplicazione = urlApplicazione.replaceAll("/+$", "");
 	}
 
 	@Override
 	@Async
 	public void inviaCodiceVerifica(String destinatario, String nome, String codice) {
-		String corpo = """
-				<p>Ciao %s,</p>
-				<p>il codice per confermare il tuo account è:</p>
-				<p style="font-size:24px;letter-spacing:4px;"><strong>%s</strong></p>
-				<p>Il codice vale 15 minuti. Fino alla conferma l'account non è utilizzabile.</p>
-				""".formatted(nome, codice);
-		spedisci(destinatario, "Conferma il tuo account", corpo);
+		Context contesto = contesto();
+		contesto.setVariable("nome", nome);
+		contesto.setVariable("codice", codice);
+		spedisci(destinatario, "Conferma il tuo account", "mail/verifica", contesto);
 	}
 
 	@Override
 	@Async
 	public void inviaTicket(String destinatario, DatiTicket ticket) {
-		String corpo = """
-				<p>Ciao %s,</p>
-				<p>ecco il tuo ticket per <strong>%s</strong>.</p>
-				<table cellpadding="6" style="border-collapse:collapse;">
-				  <tr><td>Evento</td><td><strong>%s</strong></td></tr>
-				  <tr><td>Data</td><td>%s</td></tr>
-				  <tr><td>Luogo</td><td>%s</td></tr>
-				  <tr><td>Partecipante</td><td>%s</td></tr>
-				  <tr><td>Codice</td><td><strong>%s</strong></td></tr>
-				</table>
-				<p>Presenta questo codice all'ingresso. Lo trovi anche nella tua area personale.</p>
-				""".formatted(
-				ticket.nomePartecipante(),
-				ticket.nomeEvento(),
-				ticket.nomeEvento(),
-				FORMATO_DATA.format(ticket.dataEvento()),
-				ticket.luogo(),
-				ticket.nomePartecipante(),
-				ticket.codice());
-		spedisci(destinatario, "Il tuo ticket per " + ticket.nomeEvento(), corpo);
+		Context contesto = contesto();
+		contesto.setVariable("ticket", ticket);
+		contesto.setVariable("data", FORMATO_DATA.format(ticket.dataEvento()));
+		spedisci(destinatario, "Il tuo ticket per " + ticket.nomeEvento(), "mail/ticket", contesto);
 	}
 
 	@Override
 	@Async
 	public void avvisaProprietarioNuovaIscrizione(String destinatario, String nomeProprietario,
 			String nomeEvento, String nomePartecipante) {
-		String corpo = """
-				<p>Ciao %s,</p>
-				<p><strong>%s</strong> si è iscritto al tuo evento <strong>%s</strong>.</p>
-				<p>Trovi l'elenco completo dei partecipanti nella pagina dell'evento.</p>
-				""".formatted(nomeProprietario, nomePartecipante, nomeEvento);
-		spedisci(destinatario, "Nuova iscrizione a " + nomeEvento, corpo);
+		Context contesto = contesto();
+		contesto.setVariable("nomeProprietario", nomeProprietario);
+		contesto.setVariable("nomeEvento", nomeEvento);
+		contesto.setVariable("nomePartecipante", nomePartecipante);
+		spedisci(destinatario, "Nuova iscrizione a " + nomeEvento, "mail/nuova-iscrizione", contesto);
 	}
 
-	private void spedisci(String destinatario, String oggetto, String corpoHtml) {
+	private Context contesto() {
+		Context contesto = new Context(Locale.ITALIAN);
+		contesto.setVariable("urlApplicazione", urlApplicazione);
+		return contesto;
+	}
+
+	private void spedisci(String destinatario, String oggetto, String template, Context contesto) {
 		try {
 			MimeMessage messaggio = postino.createMimeMessage();
 			MimeMessageHelper aiuto = new MimeMessageHelper(messaggio, "UTF-8");
 			aiuto.setFrom(mittente);
 			aiuto.setTo(destinatario);
 			aiuto.setSubject(oggetto);
-			aiuto.setText(corpoHtml, true);
+			aiuto.setText(motore.process(template, contesto), true);
 			postino.send(messaggio);
 			log.info("Email \"{}\" inviata a {}", oggetto, destinatario);
 		} catch (MessagingException | MailException eccezione) {

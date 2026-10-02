@@ -34,18 +34,22 @@ function intervallo(periodo: Periodo): [number, number] | null {
   }
 }
 
-// Con la posizione il backend ordina per vicinanza e aggiunge distanzaKm; senza, ordina per data.
-function caricaEventi() {
-  return new Promise<EventoMappa[]>((resolve, reject) => {
-    const senzaPosizione = () => api.mappa().then(resolve, reject)
-    if (!navigator.geolocation) return senzaPosizione()
-    navigator.geolocation.getCurrentPosition(
-      (pos) => api.mappa(pos.coords.latitude, pos.coords.longitude).then(resolve, senzaPosizione),
-      senzaPosizione,
-      { timeout: 5000, maximumAge: 120_000 },
-    )
-  })
+type Posizione = { latitudine: number; longitudine: number }
+
+// Se il permesso non e' ancora stato dato, il browser mostra la richiesta e il callback
+// arriva solo quando l'utente accetta: per questo non c'e' timeout.
+function chiediPosizione(onPosizione: (posizione: Posizione) => void) {
+  navigator.geolocation.getCurrentPosition(
+    (pos) => onPosizione({ latitudine: pos.coords.latitude, longitudine: pos.coords.longitude }),
+    () => {}, // negata o non disponibile: restano gli eventi ordinati per data
+    { maximumAge: 120_000 },
+  )
 }
+
+const preparaEventi = (lista: EventoMappa[]): EventoSullaMappa[] =>
+  lista
+    .filter((e) => Number.isFinite(e.latitudine) && Number.isFinite(e.longitudine))
+    .map((e) => ({ ...e, categoria: deduciCategoria(e.titolo) }))
 
 export default function MapDashboard() {
   const mappa = useRef<MapRef>(null)
@@ -54,17 +58,47 @@ export default function MapDashboard() {
   const [ricerca, setRicerca] = useState<Ricerca>({ testo: '', luogo: '', periodo: 'TUTTI' })
   const [filtri, setFiltri] = useState<Set<Categoria>>(new Set())
   const [selezionatoId, setSelezionatoId] = useState<number | null>(null)
+  const [posizione, setPosizione] = useState<Posizione | null>(null)
 
+  // Subito senza posizione (ordine per data), poi di nuovo appena la posizione arriva:
+  // il backend ordina per vicinanza e aggiunge distanzaKm.
   useEffect(() => {
-    caricaEventi()
-      .then((lista) =>
-        setEventi(
-          lista
-            .filter((e) => Number.isFinite(e.latitudine) && Number.isFinite(e.longitudine))
-            .map((e) => ({ ...e, categoria: deduciCategoria(e.titolo) })),
-        ),
-      )
-      .catch((e) => setErrore(e instanceof Error ? e.message : String(e)))
+    let annullato = false
+    api
+      .mappa(posizione?.latitudine, posizione?.longitudine)
+      .then((lista) => {
+        if (annullato) return
+        setEventi(preparaEventi(lista))
+        setErrore(null)
+      })
+      .catch((e) => !annullato && setErrore(e instanceof Error ? e.message : String(e)))
+    return () => {
+      annullato = true
+    }
+  }, [posizione])
+
+  // Il consenso puo' arrivare dalla richiesta del browser o piu' tardi dalle sue
+  // impostazioni: in entrambi i casi gli eventi si riordinano senza ricaricare la pagina.
+  useEffect(() => {
+    if (!navigator.geolocation) return
+    let attivo = true
+    let permesso: PermissionStatus | undefined
+    const alCambio = () => permesso?.state === 'granted' && chiediPosizione(setPosizione)
+
+    chiediPosizione((p) => attivo && setPosizione(p))
+    navigator.permissions
+      ?.query({ name: 'geolocation' })
+      .then((stato) => {
+        if (!attivo) return
+        permesso = stato
+        stato.addEventListener('change', alCambio)
+      })
+      .catch(() => {})
+
+    return () => {
+      attivo = false
+      permesso?.removeEventListener('change', alCambio)
+    }
   }, [])
 
   const visibili = useMemo(() => {
